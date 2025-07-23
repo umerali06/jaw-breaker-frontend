@@ -4,6 +4,9 @@ import OverviewView from "./views/OverviewView";
 import PatientsView from "./views/PatientsView";
 import DocumentsView from "./views/DocumentsView";
 import AnalyticsView from "./views/AnalyticsView";
+import DashboardHeader from "../ui/DashboardHeader";
+import jsPDF from "jspdf";
+import FileUploadModal from "./FileUploadModal";
 
 const MainContent = ({
   activeView,
@@ -14,8 +17,30 @@ const MainContent = ({
   onSidebarToggle,
   isSidebarCollapsed,
 }) => {
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const [viewMode, setViewMode] = useState("grid");
+
+  // SOAP modal state lifted up
+  const [isSoapModalOpen, setIsSoapModalOpen] = useState(false);
+  const [soapNote, setSoapNote] = useState(null);
+  const [isSoapLoading, setIsSoapLoading] = useState(false);
+
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const downloadSoapAsPDF = () => {
+    if (!soapNote) return;
+    const doc = new jsPDF();
+    doc.text(soapNote, 10, 10);
+    doc.save(`${selectedPatient?.name || "patient"}-SOAP-note.pdf`);
+  };
+
+  // Brand colors
+  const brandColors = {
+    primary: "#2596be",
+    accent: "#96be25",
+    dark: "#0f172a",
+    light: "#f8fafc",
+  };
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "grid" ? "list" : "grid");
@@ -24,12 +49,26 @@ const MainContent = ({
   const renderView = () => {
     switch (activeView) {
       case "overview":
-        return <OverviewView selectedPatient={selectedPatient} />;
+        return (
+          <OverviewView
+            selectedPatient={selectedPatient}
+            isSoapModalOpen={isSoapModalOpen}
+            setIsSoapModalOpen={setIsSoapModalOpen}
+            soapNote={soapNote}
+            setSoapNote={setSoapNote}
+            isSoapLoading={isSoapLoading}
+            setIsSoapLoading={setIsSoapLoading}
+            downloadSoapAsPDF={downloadSoapAsPDF}
+            isUploadModalOpen={isUploadModalOpen}
+            setIsUploadModalOpen={setIsUploadModalOpen}
+          />
+        );
       case "patients":
         return (
           <PatientsView
             selectedPatient={selectedPatient}
             onPatientSelect={onPatientSelect}
+            viewMode={viewMode}
           />
         );
       case "documents":
@@ -42,89 +81,103 @@ const MainContent = ({
       case "analytics":
         return <AnalyticsView selectedPatient={selectedPatient} />;
       default:
-        return <OverviewView selectedPatient={selectedPatient} />;
+        return (
+          <OverviewView
+            selectedPatient={selectedPatient}
+            isSoapModalOpen={isSoapModalOpen}
+            setIsSoapModalOpen={setIsSoapModalOpen}
+            soapNote={soapNote}
+            setSoapNote={setSoapNote}
+            isSoapLoading={isSoapLoading}
+            setIsSoapLoading={setIsSoapLoading}
+            downloadSoapAsPDF={downloadSoapAsPDF}
+            isUploadModalOpen={isUploadModalOpen}
+            setIsUploadModalOpen={setIsUploadModalOpen}
+          />
+        );
     }
   };
 
+  // Prepare subtitle for header if patient is selected
+  const subtitle = selectedPatient
+    ? `${selectedPatient.name} • ${
+        selectedPatient.files ? selectedPatient.files.length : 0
+      } ${
+        selectedPatient.files && selectedPatient.files.length === 1
+          ? "document"
+          : "documents"
+      }`
+    : null;
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Header */}
+    <div
+      className="flex-1 flex flex-col overflow-hidden"
+      style={
+        isDarkMode
+          ? { backgroundColor: brandColors.dark, overflowX: "hidden" }
+          : { backgroundColor: "#f8fafc", overflowX: "hidden" }
+      }
+    >
+      {/* Premium Header */}
+      <DashboardHeader
+        title={activeView}
+        subtitle={subtitle}
+        onSidebarToggle={onSidebarToggle}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onChatToggle={onChatToggle}
+        isChatOpen={isChatOpen}
+        toggleViewMode={toggleViewMode}
+        viewMode={viewMode}
+        activeView={activeView}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Main Content Area with Gradient Border */}
       <div
-        className={`${
-          isDarkMode
-            ? "bg-gray-800 border-gray-700 text-white"
-            : "bg-white border-gray-200"
-        } border-b px-6 py-4`}
+        className="flex-1 overflow-y-auto relative"
+        style={{
+          background: isDarkMode
+            ? `linear-gradient(${brandColors.dark}, ${brandColors.dark})`
+            : `linear-gradient(#f8fafc, #f8fafc)`,
+          borderTop: isDarkMode
+            ? `1px solid rgba(37, 150, 190, 0.2)`
+            : `1px solid rgba(150, 190, 37, 0.1)`,
+        }}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            {/* Sidebar Toggle Button */}
+        {/* Glow Effect Container */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            boxShadow: isDarkMode
+              ? `inset 0 1px 0 0 rgba(37, 150, 190, 0.1)`
+              : `inset 0 1px 0 0 rgba(150, 190, 37, 0.05)`,
+          }}
+        ></div>
+
+        {/* Content */}
+        <div className="p-3 sm:p-4 md:p-6 overflow-x-hidden">
+          {renderView()}
+        </div>
+      </div>
+      {/* SOAP Note Preview Modal - moved here */}
+      {isSoapModalOpen && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{ background: "rgba(0,0,0,0.4)" }}
+        >
+          <div
+            className={`rounded-xl shadow-xl max-w-2xl w-full p-4 sm:p-6 relative border-2 max-h-[90vh] flex flex-col ${
+              isDarkMode
+                ? "bg-gray-800 border-[#2596be]"
+                : "bg-white border-[#2596be]"
+            }`}
+          >
             <button
-              onClick={onSidebarToggle}
-              className={`mr-4 p-2 rounded-lg transition-colors ${
-                isDarkMode
-                  ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-              }`}
-              title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              onClick={() => setIsSoapModalOpen(false)}
+              className="absolute top-2 sm:top-3 right-2 sm:right-3 text-gray-500 hover:text-gray-900"
             >
               <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {isSidebarCollapsed ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                  />
-                )}
-              </svg>
-            </button>
-
-            <div>
-              <h2
-                className={`text-2xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                } capitalize`}
-              >
-                {activeView}
-              </h2>
-              {selectedPatient && (
-                <p
-                  className={`text-sm ${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
-                  } mt-1`}
-                >
-                  {selectedPatient.name} • {selectedPatient.files.length}{" "}
-                  documents
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            {/* AI Chat Toggle */}
-            <button
-              onClick={onChatToggle}
-              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isChatOpen
-                  ? "bg-primary-custom text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              <svg
-                className="w-4 h-4 mr-2"
+                className="w-5 h-5 sm:w-6 sm:h-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -133,102 +186,46 @@ const MainContent = ({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              AI Assistant
             </button>
-
-            {/* Quick Actions */}
-            <div className="flex items-center space-x-2">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                title={
-                  isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
-                }
-              >
-                {isDarkMode ? (
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                    />
-                  </svg>
-                )}
-              </button>
-
-              {/* View Mode Toggle (only show on documents and patients view) */}
-              {(activeView === "documents" || activeView === "patients") && (
+            <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 pr-6">
+              SOAP Note Preview
+            </h2>
+            {isSoapLoading ? (
+              <div className="text-center py-8 flex-1">
+                Generating SOAP note...
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <pre className="bg-gray-100 rounded p-3 sm:p-4 h-full max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-xs sm:text-sm mb-3 sm:mb-4 break-words">
+                    {soapNote}
+                  </pre>
+                </div>
                 <button
-                  onClick={toggleViewMode}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title={
-                    viewMode === "grid"
-                      ? "Switch to List View"
-                      : "Switch to Grid View"
-                  }
+                  onClick={downloadSoapAsPDF}
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded bg-[#2596be] text-white font-bold hover:bg-[#1d7a9c] text-sm sm:text-base"
                 >
-                  {viewMode === "grid" ? (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                      />
-                    </svg>
-                  )}
+                  Download as PDF
                 </button>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">{renderView()}</div>
+      )}
+      {/* File Upload Modal - moved here */}
+      {isUploadModalOpen && (
+        <FileUploadModal
+          selectedPatient={selectedPatient}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUploadSuccess={() => {
+            setIsUploadModalOpen(false);
+            // Optionally trigger a refresh if needed
+          }}
+        />
+      )}
     </div>
   );
 };

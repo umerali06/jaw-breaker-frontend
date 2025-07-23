@@ -3,6 +3,7 @@ import { usePatientData } from "../../../contexts/PatientDataContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { analyzeFile } from "../../../services/api";
 import FileDetailView from "../FileDetailView";
+import React from "react";
 
 const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
   const { files, loading, deleteFile, fetchFiles } = usePatientData();
@@ -12,6 +13,15 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
   const [sortBy, setSortBy] = useState("newest");
   const [localViewMode, setLocalViewMode] = useState("grid");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState(null);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [fileToDownload, setFileToDownload] = useState(null);
+  const [toast, setToast] = useState({ type: "", message: "" });
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast({ type: "", message: "" }), 2000);
+  };
 
   // Use prop viewMode if provided, otherwise use local state
   const viewMode = propViewMode || localViewMode;
@@ -54,246 +64,50 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800";
+        return "bg-[#96be25] text-white";
       case "processing":
-        return "bg-blue-100 text-blue-800";
+        return "bg-[#2596be] text-white";
       case "failed":
-        return "bg-red-100 text-red-800";
+        return "bg-red-500 text-white";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-amber-400 text-white";
       default:
         return isDarkMode
-          ? "bg-gray-700 text-gray-300"
-          : "bg-gray-100 text-gray-800";
+          ? "bg-gray-600 text-white"
+          : "bg-gray-200 text-gray-800";
     }
   };
 
   const getFileIcon = (mimetype) => {
     if (mimetype.includes("pdf")) {
       return (
-        <svg
-          className="w-8 h-8 text-red-500"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-        </svg>
+        <div className="p-2 rounded-lg bg-red-100/20">
+          <svg
+            className="w-6 h-6 text-red-500"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+          </svg>
+        </div>
       );
     } else if (mimetype.includes("word")) {
       return (
-        <svg
-          className="w-8 h-8 text-blue-500"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-        </svg>
+        <div className="p-2 rounded-lg bg-blue-100/20">
+          <svg
+            className="w-6 h-6 text-blue-500"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+          </svg>
+        </div>
       );
     } else if (mimetype.includes("image")) {
       return (
-        <svg
-          className="w-8 h-8 text-green-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      );
-    } else {
-      return (
-        <svg
-          className={`w-8 h-8 ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
-      );
-    }
-  };
-
-  const handleDeleteFile = async (fileId, fileName) => {
-    if (window.confirm(`Are you sure you want to delete "${fileName}"?`)) {
-      const result = await deleteFile(fileId);
-      if (!result.success) {
-        alert("Failed to delete file. Please try again.");
-      }
-    }
-  };
-
-  const handleDownloadFile = async (file) => {
-    try {
-      const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/upload/download/${file._id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.originalname;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        alert("Failed to download file");
-      }
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      alert("Error downloading file");
-    }
-  };
-
-  const handleAnalyzeFile = async (fileId) => {
-    try {
-      console.log("Starting analysis for file:", fileId);
-
-      // Call the analyze API
-      const result = await analyzeFile(fileId);
-      console.log("Analysis result:", result);
-
-      if (result.success) {
-        // Refresh the files list to get updated status
-        setTimeout(() => {
-          fetchFiles();
-        }, 1000);
-
-        // Show success message
-        alert("Analysis started successfully!");
-      } else {
-        console.error("Analysis failed:", result);
-        alert(`Failed to start analysis: ${result.message || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Error analyzing file:", error);
-      alert(`Error starting analysis: ${error.message || "Please try again."}`);
-    }
-  };
-
-  const DocumentCard = ({ file }) => (
-    <div
-      className={`${
-        isDarkMode
-          ? "bg-gray-800 border-gray-700 text-white"
-          : "bg-white border-gray-200"
-      } rounded-lg border p-4 hover:shadow-md transition-shadow h-full flex flex-col`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center min-w-0 flex-1">
-          <div className="flex-shrink-0">{getFileIcon(file.mimetype)}</div>
-          <div className="ml-3 min-w-0 flex-1">
-            <h3
-              className={`text-sm font-medium ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              } truncate`}
-              title={file.originalname}
-            >
-              <a
-                href={`/api/upload/view/${file._id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-primary-custom hover:underline transition-colors cursor-pointer"
-              >
-                {file.originalname}
-              </a>
-            </h3>
-            <p
-              className={`text-xs ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              }`}
-            >
-              {formatFileSize(file.size)}
-            </p>
-          </div>
-        </div>
-        <div className="flex-shrink-0 ml-2">
-          <span
-            className={`px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${getStatusColor(
-              file.processingStatus
-            )}`}
-          >
-            {file.processingStatus}
-          </span>
-        </div>
-      </div>
-
-      <div className="mb-4 flex-1">
-        <p
-          className={`text-xs ${
-            isDarkMode ? "text-gray-400" : "text-gray-500"
-          }`}
-        >
-          Uploaded {new Date(file.createdAt).toLocaleDateString()}
-        </p>
-        {file.aiSummary && (
-          <p className="text-xs text-green-600 mt-1">✓ AI Analysis Complete</p>
-        )}
-      </div>
-
-      <div className="flex gap-2 mt-auto">
-        <button
-          onClick={() => setSelectedFile(file)}
-          className="flex-1 bg-primary-custom text-white px-3 py-2 rounded text-xs font-medium hover:bg-opacity-90 transition-colors"
-        >
-          View
-        </button>
-
-        {/* Analyze button for pending files */}
-        {file.processingStatus === "pending" && (
-          <button
-            onClick={() => handleAnalyzeFile(file._id)}
-            className="px-3 py-2 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors"
-          >
-            Analyze
-          </button>
-        )}
-
-        {/* Retry button for failed files */}
-        {file.processingStatus === "failed" && (
-          <button
-            onClick={() => handleAnalyzeFile(file._id)}
-            className="px-3 py-2 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-colors"
-          >
-            Retry
-          </button>
-        )}
-
-        <button
-          onClick={() => handleDownloadFile(file)}
-          className={`px-3 py-2 border ${
-            isDarkMode
-              ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-              : "border-gray-300 text-gray-700 hover:bg-gray-50"
-          } rounded text-xs font-medium transition-colors`}
-        >
-          Download
-        </button>
-        <button
-          onClick={() => handleDeleteFile(file._id, file.originalname)}
-          className="px-3 py-2 text-red-600 hover:text-red-800 transition-colors"
-          title="Delete"
-        >
+        <div className="p-2 rounded-lg bg-green-100/20">
           <svg
-            className="w-4 h-4"
+            className="w-6 h-6 text-green-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -302,22 +116,197 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
+        </div>
+      );
+    } else {
+      return (
+        <div
+          className={`p-2 rounded-lg ${
+            isDarkMode ? "bg-gray-700" : "bg-gray-100"
+          }`}
+        >
+          <svg
+            className="w-6 h-6 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        </div>
+      );
+    }
+  };
+
+  const handleDeleteFile = (fileId, fileName) => {
+    setFileToDelete({ id: fileId, name: fileName });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (fileToDelete) {
+      const result = await deleteFile(fileToDelete.id);
+      if (result.success) {
+        showToast("success", "File deleted successfully!");
+      } else {
+        showToast("error", "Failed to delete file. Please try again.");
+      }
+      setShowDeleteModal(false);
+      setFileToDelete(null);
+    }
+  };
+
+  const handleDownloadFile = (file) => {
+    setFileToDownload(file);
+    setShowDownloadModal(true);
+  };
+
+  const confirmDownloadFile = async () => {
+    if (!fileToDownload) return;
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(
+        `/api/upload/download/${fileToDownload._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileToDownload.originalname;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast("success", "File downloaded!");
+      } else {
+        showToast("error", "Failed to download file");
+      }
+    } catch (error) {
+      showToast("error", "Error downloading file");
+    }
+    setShowDownloadModal(false);
+    setFileToDownload(null);
+  };
+
+  const handleAnalyzeFile = async (fileId) => {
+    try {
+      const result = await analyzeFile(fileId);
+      if (result.success) {
+        setTimeout(() => {
+          fetchFiles();
+        }, 1000);
+        showToast("success", "Analysis started successfully!");
+      } else {
+        showToast(
+          "error",
+          `Failed to start analysis: ${result.message || "Unknown error"}`
+        );
+      }
+    } catch (error) {
+      showToast(
+        "error",
+        `Error starting analysis: ${error.message || "Please try again."}`
+      );
+    }
+  };
+
+  const DocumentCard = ({ file }) => (
+    <div
+      className={`rounded-xl sm:rounded-3xl shadow-lg sm:shadow-xl p-3 sm:p-6 border-2 border-[#96be25] hover:shadow-2xl hover:border-[#2596be] transition-all flex flex-col h-full max-w-sm w-full ${
+        isDarkMode ? "bg-[#232b36]" : "bg-[#f6fcf3]"
+      }`}
+      style={{ boxShadow: "0 4px 24px 0 rgba(150,190,37,0.08)" }}
+    >
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="p-1.5 sm:p-2 rounded-full bg-[#2596be] flex items-center justify-center flex-shrink-0">
+            {getFileIcon(file.mimetype)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3
+              className={`text-sm sm:text-base font-bold truncate ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+              title={file.originalname}
+            >
+              {file.originalname}
+            </h3>
+            <p
+              className={`text-[10px] sm:text-xs font-medium ${
+                isDarkMode ? "text-gray-300" : "text-gray-500"
+              }`}
+            >
+              {formatFileSize(file.size)}
+            </p>
+          </div>
+        </div>
+        <span
+          className="px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold rounded-full bg-[#96be25] text-white shadow flex-shrink-0"
+          style={{ minWidth: 50, textAlign: "center" }}
+        >
+          {file.processingStatus.charAt(0).toUpperCase() +
+            file.processingStatus.slice(1)}
+        </span>
+      </div>
+
+      <div className="mb-2 sm:mb-4 flex-1">
+        <p
+          className={`text-[10px] sm:text-xs font-medium ${
+            isDarkMode ? "text-gray-400" : "text-gray-500"
+          }`}
+        >
+          Uploaded {new Date(file.createdAt).toLocaleDateString()}
+        </p>
+        {file.aiSummary && (
+          <p className="text-[10px] sm:text-xs font-bold text-[#96be25] mt-1">
+            ✓ AI Analysis Complete
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-2 sm:mt-4">
+        <button
+          onClick={() => setSelectedFile(file)}
+          className="flex-1 bg-[#2596be] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all shadow-md"
+        >
+          View Details
+        </button>
+        <button
+          onClick={() => handleDownloadFile(file)}
+          className="flex-1 border border-[#e2e8f0] text-[#2596be] bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-[#f6fcf3] focus:outline-none focus:ring-2 focus:ring-[#96be25] transition-all shadow-md"
+        >
+          Download
         </button>
       </div>
     </div>
   );
 
   const DocumentRow = ({ file }) => (
-    <tr className={`${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}>
+    <tr
+      className={`${
+        isDarkMode ? "hover:bg-gray-700/50" : "hover:bg-[#f0f7ff]"
+      }`}
+    >
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center">
           {getFileIcon(file.mimetype)}
           <div className="ml-4">
             <div
-              className={`text-sm font-medium ${
+              className={`text-sm font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               } max-w-xs truncate`}
               title={file.originalname}
@@ -325,7 +314,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
               {file.originalname}
             </div>
             <div
-              className={`text-sm ${
+              className={`text-xs font-medium ${
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               }`}
             >
@@ -337,7 +326,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
         </div>
       </td>
       <td
-        className={`px-6 py-4 whitespace-nowrap text-sm ${
+        className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
           isDarkMode ? "text-white" : "text-gray-900"
         }`}
       >
@@ -345,7 +334,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span
-          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+          className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusColor(
             file.processingStatus
           )}`}
         >
@@ -353,30 +342,30 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
         </span>
       </td>
       <td
-        className={`px-6 py-4 whitespace-nowrap text-sm ${
+        className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
           isDarkMode ? "text-gray-300" : "text-gray-500"
         }`}
       >
         {new Date(file.createdAt).toLocaleDateString()}
       </td>
       <td
-        className={`px-6 py-4 whitespace-nowrap text-sm ${
+        className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
           isDarkMode ? "text-gray-300" : "text-gray-500"
         }`}
       >
         {file.aiSummary ? (
-          <span className="text-green-600">✓ Complete</span>
+          <span className="text-[#96be25]">✓ Complete</span>
         ) : (
           <span className={`${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
             Pending
           </span>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="flex space-x-2">
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold">
+        <div className="flex space-x-3">
           <button
             onClick={() => setSelectedFile(file)}
-            className="text-primary-custom hover:text-opacity-80"
+            className="text-[#2596be] hover:text-[#1d7a9c]"
           >
             View
           </button>
@@ -402,26 +391,181 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
   );
 
   return (
-    <div className="p-4 sm:p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search documents..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 border ${
-                    isDarkMode
-                      ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400"
-                      : "border-gray-300"
-                  } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-custom focus:border-transparent`}
-                />
+    <div
+      className="p-6 overflow-y-auto min-h-screen"
+      style={{ background: isDarkMode ? "#18212f" : "#f6fcf3" }}
+    >
+      {/* Toast Notification */}
+      {toast.message && (
+        <div
+          className={`fixed top-4 sm:top-6 left-1/2 transform -translate-x-1/2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg z-50 font-bold text-center animate-fade-in text-sm sm:text-base max-w-[90%] sm:max-w-md ${
+            toast.type === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+      <div className="max-w-7xl mx-auto space-y-6">
+        {selectedFile ? (
+          <div className="p-4">
+            <FileDetailView
+              file={selectedFile}
+              onBack={() => setSelectedFile(null)}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="mb-4 sm:mb-6 md:mb-8">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 md:gap-6">
+                <div>
+                  <h1
+                    className={`text-xl sm:text-2xl font-bold ${
+                      isDarkMode
+                        ? "text-white"
+                        : "text-[var(--color-text-dark)]"
+                    } mb-1`}
+                  >
+                    Medical Documents
+                  </h1>
+                  <p
+                    className={`text-xs sm:text-sm font-medium ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    {filteredFiles.length} documents found
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full lg:w-auto">
+                  <div className="relative flex-1 min-w-0 sm:min-w-[200px] md:min-w-[250px]">
+                    <input
+                      type="text"
+                      placeholder="Search documents..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`w-full ${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                          : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)] placeholder-gray-500"
+                      } pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                    />
+                    <svg
+                      className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className={`${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-white"
+                          : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)]"
+                      } px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="completed">Completed</option>
+                      <option value="processing">Processing</option>
+                      <option value="pending">Pending</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className={`${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-white"
+                          : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)]"
+                      } px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="name">Name A-Z</option>
+                      <option value="size">Size (Largest)</option>
+                    </select>
+                    {!propViewMode && (
+                      <div
+                        className={`flex border ${
+                          isDarkMode
+                            ? "border-gray-600"
+                            : "border-[var(--color-border)]"
+                        } rounded-lg sm:rounded-xl`}
+                      >
+                        <button
+                          onClick={() => setLocalViewMode("grid")}
+                          className={`p-1.5 sm:p-2 ${
+                            viewMode === "grid"
+                              ? "bg-[#2596be] text-white"
+                              : isDarkMode
+                              ? "text-gray-400 hover:text-gray-300"
+                              : "text-gray-500 hover:text-gray-700"
+                          } rounded-l-lg sm:rounded-l-xl`}
+                        >
+                          <svg
+                            className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setLocalViewMode("list")}
+                          className={`p-1.5 sm:p-2 ${
+                            viewMode === "list"
+                              ? "bg-[#2596be] text-white"
+                              : isDarkMode
+                              ? "text-gray-400 hover:text-gray-300"
+                              : "text-gray-500 hover:text-gray-700"
+                          } rounded-r-lg sm:rounded-r-xl`}
+                        >
+                          <svg
+                            className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Content */}
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#2596be]"></div>
+              </div>
+            ) : sortedFiles.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-xl border border-[var(--color-border)] shadow-sm">
                 <svg
-                  className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"
+                  className="mx-auto h-16 w-16 text-gray-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -430,229 +574,208 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className={`px-3 py-2 border ${
-                  isDarkMode
-                    ? "border-gray-600 bg-gray-700 text-white"
-                    : "border-gray-300"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-custom`}
-              >
-                <option value="all">All Status</option>
-                <option value="completed">Completed</option>
-                <option value="processing">Processing</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className={`px-3 py-2 border ${
-                  isDarkMode
-                    ? "border-gray-600 bg-gray-700 text-white"
-                    : "border-gray-300"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-custom`}
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="name">Name A-Z</option>
-                <option value="size">Size (Largest)</option>
-              </select>
-
-              {!propViewMode && (
-                <div
-                  className={`flex border ${
-                    isDarkMode ? "border-gray-600" : "border-gray-300"
-                  } rounded-lg`}
+                <h3
+                  className={`mt-4 text-lg font-bold ${
+                    isDarkMode ? "text-white" : "text-[var(--color-text-dark)]"
+                  }`}
                 >
+                  No documents found
+                </h3>
+                <p
+                  className={`mt-2 text-sm font-medium ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {searchTerm
+                    ? "Try adjusting your search terms"
+                    : "Upload your first document to get started"}
+                </p>
+                {searchTerm && (
                   <button
-                    onClick={() => setLocalViewMode("grid")}
-                    className={`p-2 ${
-                      viewMode === "grid"
-                        ? "bg-primary-custom text-white"
-                        : isDarkMode
-                        ? "text-gray-400 hover:text-gray-300"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                    onClick={() => setSearchTerm("")}
+                    className="mt-4 bg-[#2596be] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#1d7a9c] transition-colors shadow-md"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                      />
-                    </svg>
+                    Clear Search
                   </button>
-                  <button
-                    onClick={() => setLocalViewMode("list")}
-                    className={`p-2 ${
-                      viewMode === "list"
-                        ? "bg-primary-custom text-white"
-                        : isDarkMode
-                        ? "text-gray-400 hover:text-gray-300"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
+                )}
+              </div>
+            ) : viewMode === "grid" ? (
+              <div
+                className="grid gap-3 sm:gap-4"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                  gridAutoRows: "1fr",
+                  alignItems: "stretch",
+                }}
+              >
+                {sortedFiles.map((file) => (
+                  <div key={file._id} className="flex">
+                    <DocumentCard file={file} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className={`rounded-xl border ${
+                  isDarkMode
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-[var(--color-border)]"
+                } shadow-sm overflow-hidden`}
+              >
+                <table
+                  className={`min-w-full divide-y ${
+                    isDarkMode ? "divide-gray-700" : "divide-gray-200"
+                  }`}
+                >
+                  <thead
+                    className={`${isDarkMode ? "bg-gray-700" : "bg-gray-50"}`}
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
+                    <tr>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        Document
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        Size
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        Status
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        Uploaded
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-left text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        AI Analysis
+                      </th>
+                      <th
+                        className={`px-6 py-3 text-right text-xs font-bold ${
+                          isDarkMode ? "text-gray-300" : "text-gray-500"
+                        } uppercase tracking-wider`}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    className={`${
+                      isDarkMode
+                        ? "bg-gray-800 divide-gray-700"
+                        : "bg-white divide-gray-200"
+                    } divide-y`}
+                  >
+                    {sortedFiles.map((file) => (
+                      <DocumentRow key={file._id} file={file} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+          <div
+            className={`rounded-xl shadow-lg p-4 sm:p-6 max-w-sm w-full ${
+              isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+            }`}
+          >
+            <h3 className="font-bold text-base sm:text-lg mb-2">Delete File</h3>
+            <p
+              className={`mb-4 text-sm sm:text-base ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">{fileToDelete?.name}</span>?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setFileToDelete(null);
+                }}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteFile}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-red-500 text-white font-semibold hover:bg-red-600"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Content */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-custom"></div>
-          </div>
-        ) : sortedFiles.length === 0 ? (
-          <div className="text-center py-12">
-            <svg
-              className="w-16 h-16 text-gray-400 mx-auto mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <h3
-              className={`text-lg font-medium ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              } mb-2`}
-            >
-              No documents found
+      {/* Download Preview Modal */}
+      {showDownloadModal && fileToDownload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+          <div
+            className={`rounded-xl shadow-lg p-4 sm:p-6 max-w-sm w-full ${
+              isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+            }`}
+          >
+            <h3 className="font-bold text-base sm:text-lg mb-2">
+              Download Preview
             </h3>
             <p
-              className={`${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              } mb-4`}
-            >
-              {searchTerm
-                ? "Try adjusting your search terms"
-                : "Upload your first document to get started"}
-            </p>
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr">
-            {sortedFiles.map((file) => (
-              <DocumentCard key={file._id} file={file} />
-            ))}
-          </div>
-        ) : (
-          <div
-            className={`${
-              isDarkMode
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-200"
-            } rounded-lg border overflow-hidden`}
-          >
-            <table
-              className={`min-w-full divide-y ${
-                isDarkMode ? "divide-gray-700" : "divide-gray-200"
+              className={`mb-4 text-sm sm:text-base ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
               }`}
             >
-              <thead className={`${isDarkMode ? "bg-gray-700" : "bg-gray-50"}`}>
-                <tr>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    Document
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    Size
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    Status
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    Uploaded
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    AI Analysis
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-right text-xs font-medium ${
-                      isDarkMode ? "text-gray-300" : "text-gray-500"
-                    } uppercase tracking-wider`}
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody
-                className={`${
-                  isDarkMode
-                    ? "bg-gray-800 divide-gray-700"
-                    : "bg-white divide-gray-200"
-                } divide-y`}
+              You are about to download{" "}
+              <span className="font-semibold break-words">
+                {fileToDownload.originalname}
+              </span>
+              .
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDownloadModal(false);
+                  setFileToDownload(null);
+                }}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
               >
-                {sortedFiles.map((file) => (
-                  <DocumentRow key={file._id} file={file} />
-                ))}
-              </tbody>
-            </table>
+                Cancel
+              </button>
+              <button
+                onClick={confirmDownloadFile}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-[#2596be] text-white font-semibold hover:bg-[#1d7a9c]"
+              >
+                Download
+              </button>
+            </div>
           </div>
-        )}
-
-        {/* File Detail Modal */}
-        {selectedFile && (
-          <FileDetailView
-            file={selectedFile}
-            onClose={() => setSelectedFile(null)}
-          />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

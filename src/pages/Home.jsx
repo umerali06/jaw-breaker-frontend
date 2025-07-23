@@ -8,7 +8,7 @@ import Meta from "../components/Meta";
 
 const Home = () => {
   return (
-    <>
+    <div className="flex flex-col w-full">
       <Meta
         title="Jawbreaker | 15 minutes OASIS"
         description="Chart an OASIS in under 15 minutes. Improve accuracy, boost productivity, and end clinician burnout with Jawbreaker."
@@ -19,7 +19,7 @@ const Home = () => {
       <Integration />
       <Benefits />
       <CallToAction />
-    </>
+    </div>
   );
 };
 

@@ -4,13 +4,18 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #2596be;
-  --color-secondary: #96be25;
+  --color-primary: #2596be; /* Primary Blue */
+  --color-secondary: #96be25; /* Accent Green */
   --color-text-dark: #333333;
   --color-text-light: #ffffff;
   --color-bg-light: #f0f7ff;
   --color-bg-white: #ffffff;
   --color-border: #e5e7eb;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  font-weight: 700; /* Bold */
 }
 
 /* Custom color classes */
@@ -36,102 +41,123 @@
 /* Container and layout */
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: "Inter", "Roboto", "Poppins", system-ui, sans-serif;
     scroll-behavior: smooth;
+    font-weight: 700; /* Make all text bold by default */
   }
   body {
-    @apply bg-white text-gray-900 transition-colors duration-200;
+    @apply bg-white text-gray-900 transition-colors duration-200 font-bold;
   }
-  
+
+  /* Make all text elements bold by default */
+  p,
+  span,
+  a,
+  button,
+  input,
+  textarea,
+  select,
+  label,
+  li,
+  td,
+  th {
+    @apply font-bold;
+  }
+
   /* Dark mode styles */
   .dark body {
     @apply bg-gray-900 text-gray-100;
   }
-  
+
   .dark .bg-white {
     @apply bg-gray-800;
   }
-  
+
   .dark .text-gray-900 {
     @apply text-gray-100;
   }
-  
+
   .dark .text-gray-600 {
     @apply text-gray-300;
   }
-  
+
   .dark .text-gray-500 {
     @apply text-gray-400;
   }
-  
+
   .dark .border-gray-200 {
     @apply border-gray-700;
   }
-  
+
   .dark .border-gray-300 {
     @apply border-gray-600;
   }
-  
+
   .dark .bg-gray-50 {
     @apply bg-gray-800;
   }
-  
+
   .dark .bg-gray-100 {
     @apply bg-gray-700;
   }
-  
+
   .dark .hover\:bg-gray-50:hover {
     @apply bg-gray-700;
   }
-  
+
   .dark .hover\:bg-gray-100:hover {
     @apply bg-gray-600;
   }
-  
+
   .dark .bg-white {
     @apply bg-gray-800;
   }
-  
+
   .dark .text-gray-900 {
     @apply text-gray-100;
   }
-  
+
   .dark .text-gray-800 {
     @apply text-gray-200;
   }
-  
+
   .dark .text-gray-700 {
     @apply text-gray-300;
   }
-  
+
   .dark .text-gray-600 {
     @apply text-gray-400;
   }
-  
+
   .dark .text-gray-500 {
     @apply text-gray-500;
   }
-  
+
   .dark .border-gray-200 {
     @apply border-gray-700;
   }
-  
+
   .dark .bg-gray-50 {
     @apply bg-gray-800;
   }
-  
+
   .dark .bg-gray-100 {
     @apply bg-gray-700;
   }
-  
+
   .dark .hover\\:bg-gray-50:hover {
     @apply bg-gray-700;
   }
-  
+
   .dark .hover\\:bg-gray-100:hover {
     @apply bg-gray-600;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-bold;
   }
   a {
@@ -142,6 +168,113 @@
 @layer components {
   .container {
     @apply px-4 mx-auto max-w-7xl;
+  }
+
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+  .status-badge {
+    @apply text-xs px-2 py-1 rounded-full whitespace-nowrap;
+  }
+  .status-completed {
+    @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400;
+  }
+  .status-processing {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400;
+  }
+
+  .brand-gradient {
+    background: linear-gradient(135deg, #2596be, #96be25);
+  }
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+  .status-badge {
+    @apply text-xs px-2 py-1 rounded-full whitespace-nowrap;
+  }
+
+  /* Enhanced card styling */
+  .dashboard-card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-md transition-all hover:shadow-lg;
+  }
+
+  .dark .dashboard-card {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  /* Enhanced button styling */
+  .btn-dashboard {
+    @apply px-4 py-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply text-white;
+  }
+
+  .btn-secondary {
+    @apply text-white;
+  }
+
+  /* Status badges with branding colors */
+  .status-badge {
+    @apply px-2 py-1 text-xs rounded-full font-bold;
+  }
+
+  .status-badge-success {
+    /* Add opacity with inline style or custom selector if needed */
+  }
+
+  .status-badge-pending {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .status-badge-processing {
+    /* Add opacity with inline style or custom selector if needed */
+  }
+
+  .status-badge-error {
+    @apply bg-red-100 text-red-800;
+  }
+
+  /* Enhanced table styling */
+  .dashboard-table {
+    @apply min-w-full bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md;
+  }
+
+  .dark .dashboard-table {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .dashboard-table th {
+    @apply py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200;
+  }
+
+  .dark .dashboard-table th {
+    @apply bg-gray-700 text-gray-300 border-gray-600;
+  }
+
+  .dashboard-table td {
+    @apply py-4 px-4 whitespace-nowrap border-b border-gray-200;
+  }
+
+  .dark .dashboard-table td {
+    @apply border-gray-700;
+  }
+
+  .dashboard-table tr:hover {
+    @apply bg-gray-50;
+  }
+
+  .dark .dashboard-table tr:hover {
+    @apply bg-gray-700;
   }
 }
 
@@ -168,7 +301,16 @@
 
 /* Custom shadows */
 .shadow-lg {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-primary {
+  box-shadow: 0 4px 14px -3px rgba(37, 150, 190, 0.5);
+}
+
+.shadow-secondary {
+  box-shadow: 0 4px 14px -3px rgba(150, 190, 37, 0.5);
 }
 
 /* Custom transitions */
@@ -180,7 +322,7 @@
 
 /* Blue background for sections */
 .bg-blue-50 {
-  background-color: #f0f7ff;
+  background-color: #f0f7ff !important;
 }
 
 /* Custom button styles */
@@ -203,4 +345,111 @@
   left: 0;
   width: 100%;
   height: 100%;
+}
+
+.bg-glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Dashboard specific styles */
+.metric-card {
+  @apply bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-all;
+}
+
+.dark .metric-card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.metric-card-primary {
+  @apply border-l-4;
+}
+
+.metric-card-secondary {
+  @apply border-l-4;
+}
+
+.metric-card-yellow {
+  @apply border-l-4 border-yellow-500;
+}
+
+.metric-card-red {
+  @apply border-l-4 border-red-500;
+}
+
+/* Hover effects for interactive elements */
+.hover-effect {
+  @apply transition-all duration-200 transform hover:scale-105;
+}
+
+.hover-shadow {
+  @apply transition-shadow duration-200 hover:shadow-lg;
+}
+
+/* Button hover effects */
+button:hover,
+.btn:hover {
+  @apply transform scale-105 transition-transform duration-200;
+}
+
+/* Improved form controls */
+input,
+select,
+textarea {
+  @apply rounded-lg border border-gray-300 focus:ring-2 transition-all duration-200;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  @apply border-gray-600 bg-gray-700 text-white;
+}
+
+/* Custom hover opacity for buttons */
+.btn-primary:hover,
+.btn-secondary:hover {
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+/* Premium custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #2596be 60%, #96be25 100%);
+  border-radius: 8px;
+  min-height: 40px;
+  box-shadow: 0 2px 8px rgba(37, 150, 190, 0.08);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #2596be 80%, #96be25 100%);
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2596be #f0f7ff;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #2596be 60%, #232b36 100%);
+}
+.dark ::-webkit-scrollbar-track {
+  background: #232b36;
+}
+.dark * {
+  scrollbar-color: #2596be #232b36;
 }

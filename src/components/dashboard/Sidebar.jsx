@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePatientData } from "../../contexts/PatientDataContext";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -17,17 +17,26 @@ const Sidebar = ({
   const { patients, loading } = usePatientData();
   const { isDarkMode } = useTheme();
   const [searchTerm, setSearchTerm] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Brand colors with proper contrast
+  const brandColors = {
+    primary: "#2596be",
+    accent: "#96be25",
+    dark: "#0f172a",
+    light: "#f8fafc",
+  };
 
   const menuItems = [
     {
       id: "overview",
       label: "Overview",
-      icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z",
+      icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
     },
     {
       id: "patients",
       label: "Patients",
-      icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z",
+      icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197",
     },
     {
       id: "documents",
@@ -41,302 +50,428 @@ const Sidebar = ({
     },
   ];
 
-  const filteredPatients = patients.filter((patient) =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPatients = (patients || []).filter((patient) =>
+    (patient.name || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleLogout = () => {
-    logout();
-  };
+  // Close drawer on resize above md
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setDrawerOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-  return (
-    <div
-      className={`${isCollapsed ? "w-16" : "w-80"} ${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      } border-r flex flex-col h-full transition-all duration-300 ease-in-out`}
+  // Helper: Sidebar header arrow icon
+  const ArrowIcon = ({ direction = "left", ...props }) => (
+    <svg
+      className="w-6 h-6"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      {...props}
     >
-      {/* Header */}
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d={direction === "left" ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"}
+      />
+    </svg>
+  );
+
+  // SidebarContent component for DRY rendering
+  const SidebarContent = () => (
+    <>
+      {/* Premium Brand Header */}
       <div
-        className={`${isCollapsed ? "p-3" : "p-6"} border-b ${
+        className={`p-4 flex ${
+          isCollapsed ? "flex-col items-center" : "justify-between items-center"
+        } gap-3`}
+        style={{ backgroundColor: brandColors.primary }}
+      >
+        {!isCollapsed ? (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <img
+                  src="jawbreaker-white.png"
+                  alt="/jawbreaker-white.png"
+                  className="w-6 h-6"
+                  srcSet=""
+                  style={{ backgroundColor: "#2596be" }}
+                />
+              </div>
+              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                JAWBREAKER
+              </h1>
+            </div>
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="text-white hover:text-accent transition-colors"
+            >
+              <ArrowIcon direction="left" />
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-white hover:text-accent transition-colors"
+          >
+            <ArrowIcon direction="right" />
+          </button>
+        )}
+      </div>
+      {/* User Profile with Glass Effect */}
+      <div
+        className={`p-4 flex ${
+          isCollapsed ? "flex-col items-center" : "items-center gap-3"
+        } ${isDarkMode ? "bg-gray-800" : "bg-gray-50"} border-b ${
           isDarkMode ? "border-gray-700" : "border-gray-200"
         }`}
       >
         <div
-          className={`flex items-center ${
-            isCollapsed ? "justify-center" : "justify-between"
-          } mb-4`}
+          className={`${
+            isCollapsed ? "w-12 h-12" : "w-14 h-14"
+          } rounded-full flex items-center justify-center text-white font-bold text-xl`}
+          style={{
+            background: `linear-gradient(135deg, ${brandColors.primary}, ${brandColors.accent})`,
+            boxShadow: "0 4px 15px rgba(37, 150, 190, 0.3)",
+          }}
         >
-          {!isCollapsed && (
-            <h1
-              className={`text-xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Jawbreaker
-            </h1>
-          )}
-          <button
-            onClick={onUploadClick}
-            className={`bg-primary-custom text-white ${
-              isCollapsed ? "p-2" : "px-3 py-1.5"
-            } rounded-lg text-sm font-medium hover:bg-opacity-90 transition-colors`}
-            title={isCollapsed ? "Upload" : ""}
-          >
-            {isCollapsed ? (
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-            ) : (
-              "Upload"
-            )}
-          </button>
+          {user?.name?.charAt(0)?.toUpperCase() || "D"}
         </div>
-
-        {/* User Info */}
         {!isCollapsed && (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary-custom rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user?.name?.charAt(0)?.toUpperCase() || "U"}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p
-                className={`text-sm font-medium ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                } truncate`}
-              >
-                {user?.name || "User"}
-              </p>
-              <p
-                className={`text-xs ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                } truncate`}
-              >
-                {user?.email}
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              title="Logout"
+          <div className="flex-1 min-w-0">
+            <p
+              className={`text-sm font-bold ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              } truncate`}
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-            </button>
+              Dr. {user?.name || "User"}
+            </p>
+            <p
+              className={`text-xs font-medium ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              } truncate`}
+            >
+              {user?.email}
+            </p>
           </div>
         )}
-
-        {isCollapsed && (
-          <div className="flex justify-center">
-            <div className="w-8 h-8 bg-primary-custom rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user?.name?.charAt(0)?.toUpperCase() || "U"}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <div
-        className={`${isCollapsed ? "p-2" : "p-4"} border-b ${
-          isDarkMode ? "border-gray-700" : "border-gray-200"
-        }`}
-      >
-        <nav className="space-y-1">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveView(item.id)}
-              className={`w-full flex items-center ${
-                isCollapsed ? "justify-center px-2 py-3" : "px-3 py-2"
-              } text-sm font-medium rounded-lg transition-colors ${
-                activeView === item.id
-                  ? "bg-primary-custom text-white"
-                  : isDarkMode
-                  ? "text-gray-300 hover:bg-gray-700"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
-              title={isCollapsed ? item.label : ""}
-            >
-              <svg
-                className={`w-5 h-5 ${isCollapsed ? "" : "mr-3"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d={item.icon}
-                />
-              </svg>
-              {!isCollapsed && item.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {/* Patient List */}
-      {!isCollapsed && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div
-            className={`p-4 border-b ${
-              isDarkMode ? "border-gray-700" : "border-gray-200"
-            }`}
+        {!isCollapsed && (
+          <button
+            onClick={logout}
+            className={`p-2 rounded-full ${
+              isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            } transition-colors`}
+            title="Logout"
           >
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search patients..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 border ${
-                  isDarkMode
-                    ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400"
-                    : "border-gray-300"
-                } rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-custom focus:border-transparent`}
+            <svg
+              className="w-5 h-5 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
               />
-              <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
+            </svg>
+          </button>
+        )}
+      </div>
+      {/* Floating Upload Button */}
+      <div className={`p-3 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+        <button
+          onClick={onUploadClick}
+          className={`w-full py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-md ${
+            isDarkMode
+              ? "bg-gray-700 hover:bg-gray-600 text-white"
+              : "bg-white hover:bg-gray-50 text-gray-800"
+          }`}
+          style={{
+            border: `2px dashed ${
+              isDarkMode ? brandColors.primary : brandColors.accent
+            }`,
+            boxShadow: `0 4px 15px ${
+              isDarkMode ? "rgba(37, 150, 190, 0.2)" : "rgba(150, 190, 37, 0.2)"
+            }`,
+          }}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          {!isCollapsed && <span>Upload Scan</span>}
+        </button>
+      </div>
+      {/* Navigation with Glow Effect */}
+      <nav className="p-3 space-y-2 flex-shrink-0">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveView(item.id)}
+            className={`w-full flex items-center ${
+              isCollapsed ? "justify-center p-3" : "px-4 py-3"
+            } rounded-xl transition-all font-bold text-sm ${
+              activeView === item.id
+                ? isDarkMode
+                  ? `bg-gray-700 text-${brandColors.accent} border-l-4 border-${brandColors.accent}`
+                  : `bg-${brandColors.primary} bg-opacity-10 text-${brandColors.primary} border-l-4 border-${brandColors.primary}`
+                : isDarkMode
+                ? "text-gray-300 hover:bg-gray-700"
+                : "text-gray-600 hover:bg-gray-100"
+            }`}
+            style={
+              activeView === item.id
+                ? isDarkMode
+                  ? {
+                      backgroundColor: "rgba(150, 190, 37, 0.1)",
+                      borderLeftColor: brandColors.accent,
+                      color: brandColors.accent,
+                    }
+                  : {
+                      backgroundColor: "rgba(37, 150, 190, 0.1)",
+                      borderLeftColor: brandColors.primary,
+                      color: brandColors.primary,
+                    }
+                : {}
+            }
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={
+                activeView === item.id
+                  ? isDarkMode
+                    ? { stroke: brandColors.accent }
+                    : { stroke: brandColors.primary }
+                  : {}
+              }
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={item.icon}
+              />
+            </svg>
+            {!isCollapsed && <span className="ml-3">{item.label}</span>}
+          </button>
+        ))}
+      </nav>
+      {/* Patient List with Status Indicators */}
+      {!isCollapsed && (
+        <div
+          className={`p-3 border-t ${
+            isDarkMode ? "border-gray-800" : "border-gray-200"
+          } flex-1 min-h-0 overflow-y-auto`}
+        >
+          <div className="relative mb-3">
+            <input
+              type="text"
+              placeholder="Search patients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm font-bold ${
+                isDarkMode
+                  ? "bg-gray-800 text-white placeholder-gray-400 focus:ring-2 focus:ring-accent"
+                  : "bg-gray-100 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-primary"
+              } focus:outline-none`}
+              style={{
+                border: isDarkMode
+                  ? `1px solid ${brandColors.primary}`
+                  : `1px solid ${brandColors.accent}`,
+              }}
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              style={{
+                stroke: isDarkMode ? brandColors.accent : brandColors.primary,
+              }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-2 pr-2">
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-custom"></div>
+              <div className="flex justify-center py-4">
+                <div
+                  className="animate-spin rounded-full h-6 w-6 border-b-2 border-t-2"
+                  style={{
+                    borderTopColor: brandColors.primary,
+                    borderBottomColor: brandColors.accent,
+                  }}
+                ></div>
               </div>
             ) : filteredPatients.length === 0 ? (
-              <div className="text-center py-8">
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  } text-sm`}
-                >
-                  {searchTerm ? "No patients found" : "No patients yet"}
-                </p>
-              </div>
+              <p
+                className={`text-center py-4 text-sm font-medium ${
+                  isDarkMode ? "text-gray-500" : "text-gray-400"
+                }`}
+              >
+                {searchTerm ? "No matches found" : "No patients"}
+              </p>
             ) : (
-              <div className="space-y-2">
-                {filteredPatients.map((patient) => (
-                  <button
-                    key={patient.id}
-                    onClick={() => setSelectedPatient(patient)}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                      selectedPatient?.id === patient.id
-                        ? isDarkMode
-                          ? "border-primary-custom bg-blue-900 bg-opacity-50"
-                          : "border-primary-custom bg-blue-50"
-                        : isDarkMode
-                        ? "border-gray-600 hover:border-gray-500 hover:bg-gray-700"
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`text-sm font-medium ${
-                            isDarkMode ? "text-white" : "text-gray-900"
-                          } truncate`}
-                        >
-                          {patient.name}
-                        </p>
-                        <p
-                          className={`text-xs ${
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          {patient.files.length} document
-                          {patient.files.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            patient.status === "active"
-                              ? "bg-green-400"
-                              : "bg-gray-400"
-                          }`}
-                        ></span>
-                      </div>
-                    </div>
-                    <p
-                      className={`text-xs ${
-                        isDarkMode ? "text-gray-500" : "text-gray-400"
-                      } mt-1`}
+              filteredPatients.map((patient, idx) => (
+                <button
+                  key={patient.id || patient._id || patient.name || idx}
+                  onClick={() => setSelectedPatient(patient)}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
+                    selectedPatient?.id === patient.id
+                      ? isDarkMode
+                        ? `bg-${brandColors.accent} bg-opacity-20 border border-${brandColors.accent}`
+                        : `bg-${brandColors.primary} bg-opacity-10 border border-${brandColors.primary}`
+                      : isDarkMode
+                      ? "bg-gray-800 hover:bg-gray-700"
+                      : "bg-white hover:bg-gray-50"
+                  } shadow-xs`}
+                  style={
+                    selectedPatient?.id === patient.id
+                      ? isDarkMode
+                        ? {
+                            backgroundColor: "rgba(150, 190, 37, 0.2)",
+                            borderColor: brandColors.accent,
+                          }
+                        : {
+                            backgroundColor: "rgba(37, 150, 190, 0.1)",
+                            borderColor: brandColors.primary,
+                          }
+                      : {}
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                        selectedPatient?.id === patient.id
+                          ? isDarkMode
+                            ? "bg-white text-gray-900"
+                            : "bg-primary text-white"
+                          : isDarkMode
+                          ? "bg-gray-700 text-gray-200"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
                     >
-                      Updated{" "}
-                      {new Date(patient.lastUpdated).toLocaleDateString()}
-                    </p>
-                  </button>
-                ))}
-              </div>
+                      {patient.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-left">
+                      <p
+                        className={`text-sm font-bold ${
+                          selectedPatient?.id === patient.id
+                            ? isDarkMode
+                              ? "text-white"
+                              : "text-primary"
+                            : isDarkMode
+                            ? "text-gray-200"
+                            : "text-gray-800"
+                        }`}
+                      >
+                        {patient.name}
+                      </p>
+                      <p
+                        className={`text-xs ${
+                          selectedPatient?.id === patient.id
+                            ? isDarkMode
+                              ? "text-gray-300"
+                              : "text-primary-600"
+                            : isDarkMode
+                            ? "text-gray-500"
+                            : "text-gray-500"
+                        }`}
+                      >
+                        {(patient.files || []).length} records
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      patient.status === "active"
+                        ? isDarkMode
+                          ? "bg-green-400"
+                          : "bg-green-500"
+                        : isDarkMode
+                        ? "bg-gray-600"
+                        : "bg-gray-400"
+                    }`}
+                  ></div>
+                </button>
+              ))
             )}
           </div>
         </div>
       )}
-
       {/* Collapsed Patient Indicators */}
       {isCollapsed && (
-        <div className="flex-1 flex flex-col items-center py-4 space-y-2 overflow-y-auto">
-          {filteredPatients.slice(0, 5).map((patient) => (
+        <div
+          className={`p-3 border-t ${
+            isDarkMode ? "border-gray-800" : "border-gray-200"
+          } flex flex-col items-center gap-2`}
+        >
+          {filteredPatients.slice(0, 5).map((patient, idx) => (
             <button
-              key={patient.id}
+              key={patient.id || patient._id || patient.name || idx}
               onClick={() => setSelectedPatient(patient)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
                 selectedPatient?.id === patient.id
-                  ? "bg-primary-custom text-white"
+                  ? isDarkMode
+                    ? `bg-${brandColors.accent} text-white`
+                    : `bg-${brandColors.primary} text-white`
                   : isDarkMode
-                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  ? "bg-gray-700 text-gray-200"
+                  : "bg-gray-100 text-gray-800"
               }`}
+              style={
+                selectedPatient?.id === patient.id
+                  ? isDarkMode
+                    ? { backgroundColor: brandColors.accent }
+                    : { backgroundColor: brandColors.primary }
+                  : {}
+              }
               title={patient.name}
             >
               {patient.name.charAt(0).toUpperCase()}
             </button>
           ))}
-          {filteredPatients.length > 5 && (
-            <div className="text-xs text-gray-400 text-center">
-              +{filteredPatients.length - 5}
-            </div>
-          )}
         </div>
       )}
+    </>
+  );
+
+  return (
+    <div
+      className={`${
+        isCollapsed ? "w-16 sm:w-20" : "w-56 sm:w-64"
+      } h-full flex flex-col transition-all duration-300 ${
+        isDarkMode ? "bg-gray-900" : "bg-white"
+      } border-r ${
+        isDarkMode ? "border-gray-800" : "border-gray-200"
+      } shadow-xl`}
+      style={isDarkMode ? { backgroundColor: brandColors.dark } : {}}
+    >
+      <SidebarContent />
     </div>
   );
 };

@@ -1,8 +1,20 @@
 import { useState, useEffect } from "react";
 import { usePatientData } from "../../../contexts/PatientDataContext";
 import { useTheme } from "../../../contexts/ThemeContext";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
-const AnalyticsView = ({ selectedPatient }) => {
+const AnalyticsView = () => {
   const { patients, files } = usePatientData();
   const { isDarkMode } = useTheme();
   const [timeRange, setTimeRange] = useState("30"); // days
@@ -61,10 +73,10 @@ const AnalyticsView = ({ selectedPatient }) => {
     }
 
     // Patient activity
-    const patientActivity = patients
+    const patientActivity = (patients || [])
       .map((patient) => ({
         name: patient.name,
-        documents: patient.files.filter(
+        documents: (patient.files || []).filter(
           (f) => new Date(f.createdAt) > cutoffDate
         ).length,
         lastActivity: patient.lastUpdated,
@@ -146,19 +158,19 @@ const AnalyticsView = ({ selectedPatient }) => {
     <div
       className={`${
         isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      } rounded-lg border p-6`}
+      } rounded-lg border p-3 sm:p-6 h-full`}
     >
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <p
-            className={`text-sm font-medium ${
+            className={`text-[10px] sm:text-xs md:text-sm font-medium truncate ${
               isDarkMode ? "text-gray-300" : "text-gray-600"
             }`}
           >
             {title}
           </p>
           <p
-            className={`text-3xl font-bold ${
+            className={`text-lg sm:text-xl md:text-3xl font-bold truncate ${
               isDarkMode ? "text-white" : "text-gray-900"
             }`}
           >
@@ -166,19 +178,50 @@ const AnalyticsView = ({ selectedPatient }) => {
           </p>
           {subtitle && (
             <p
-              className={`text-sm ${
+              className={`text-[10px] sm:text-xs ${
                 isDarkMode ? "text-gray-400" : "text-gray-500"
-              } mt-1`}
+              } mt-0.5 truncate`}
             >
               {subtitle}
             </p>
           )}
         </div>
-        <div className={`p-3 rounded-lg bg-${color}-100`}>
+        <div
+          className={`p-1.5 sm:p-2 md:p-3 rounded-lg flex-shrink-0`}
+          style={{
+            backgroundColor: isDarkMode
+              ? `rgba(${
+                  color === "blue"
+                    ? "37, 99, 235"
+                    : color === "green"
+                    ? "52, 168, 83"
+                    : color === "yellow"
+                    ? "251, 188, 4"
+                    : "211, 47, 47"
+                }, 0.2)`
+              : `rgba(${
+                  color === "blue"
+                    ? "37, 99, 235"
+                    : color === "green"
+                    ? "52, 168, 83"
+                    : color === "yellow"
+                    ? "251, 188, 4"
+                    : "211, 47, 47"
+                }, 0.1)`,
+          }}
+        >
           <svg
-            className={`w-6 h-6 text-${color}-600`}
+            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-6 md:h-6`}
             fill="none"
-            stroke="currentColor"
+            stroke={
+              color === "blue"
+                ? "#2563eb"
+                : color === "green"
+                ? "#34a853"
+                : color === "yellow"
+                ? "#fbbc04"
+                : "#d32f2f"
+            }
             viewBox="0 0 24 24"
           >
             <path
@@ -191,9 +234,9 @@ const AnalyticsView = ({ selectedPatient }) => {
         </div>
       </div>
       {trend && (
-        <div className="mt-4 flex items-center">
+        <div className="mt-1 sm:mt-2 md:mt-4 flex items-center">
           <span
-            className={`text-sm font-medium ${
+            className={`text-[10px] sm:text-xs font-medium ${
               trend.direction === "up"
                 ? "text-green-600"
                 : trend.direction === "down"
@@ -211,9 +254,9 @@ const AnalyticsView = ({ selectedPatient }) => {
             {trend.value}
           </span>
           <span
-            className={`text-sm ${
+            className={`text-[10px] sm:text-xs ${
               isDarkMode ? "text-gray-400" : "text-gray-500"
-            } ml-2`}
+            } ml-1 truncate`}
           >
             vs last period
           </span>
@@ -226,40 +269,48 @@ const AnalyticsView = ({ selectedPatient }) => {
     <div
       className={`${
         isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      } rounded-lg border p-6`}
+      } rounded-lg border p-3 sm:p-6 h-full flex flex-col`}
     >
       <h3
-        className={`text-lg font-semibold ${
+        className={`text-sm sm:text-base md:text-lg font-semibold ${
           isDarkMode ? "text-white" : "text-gray-900"
-        } mb-4`}
+        } mb-2 sm:mb-4 truncate`}
       >
         {title}
       </h3>
-      {children}
+      <div className="flex-1 min-h-0 flex flex-col">{children}</div>
     </div>
   );
 
   return (
-    <div className="p-6 overflow-y-auto">
+    <div className="p-3 sm:p-6 overflow-y-auto">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
           <div>
             <h2
-              className={`text-2xl font-bold ${
+              className={`text-lg sm:text-xl md:text-2xl font-bold ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
               Analytics Dashboard
             </h2>
-            <p className={`${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+            <p
+              className={`text-xs sm:text-sm ${
+                isDarkMode ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
               Clinical insights and performance metrics
             </p>
           </div>
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-custom"
+            className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2596be] ${
+              isDarkMode
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+            }`}
           >
             <option value="7">Last 7 days</option>
             <option value="30">Last 30 days</option>
@@ -269,7 +320,7 @@ const AnalyticsView = ({ selectedPatient }) => {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
           <StatCard
             title="Total Documents"
             value={analytics.totalDocuments}
@@ -309,128 +360,167 @@ const AnalyticsView = ({ selectedPatient }) => {
         </div>
 
         {/* Charts and Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
           {/* Processing Trends */}
           <ChartCard title="Document Processing Trends">
-            <div className="space-y-3">
-              {analytics.processingTrends.map((day, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span
-                    className={`text-sm ${
-                      isDarkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
-                    {day.date}
-                  </span>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                      <span
-                        className={`text-sm ${
-                          isDarkMode ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
-                        {day.uploaded} uploaded
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                      <span
-                        className={`text-sm ${
-                          isDarkMode ? "text-gray-200" : "text-gray-900"
-                        }`}
-                      >
-                        {day.processed} processed
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="w-full h-40 sm:h-48 md:h-72 flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={analytics.processingTrends}
+                  margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+                >
+                  <XAxis
+                    dataKey="date"
+                    stroke={isDarkMode ? "#fff" : "#333"}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis
+                    stroke={isDarkMode ? "#fff" : "#333"}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: isDarkMode ? "#222" : "#fff",
+                      borderRadius: 8,
+                      border: "none",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "10px" }} />
+                  <Bar
+                    dataKey="uploaded"
+                    name="Uploaded"
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#uploadedGradient)"
+                  />
+                  <Bar
+                    dataKey="processed"
+                    name="Processed"
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#processedGradient)"
+                  />
+                  <defs>
+                    <linearGradient
+                      id="uploadedGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="0%" stopColor="#2596be" />
+                      <stop offset="100%" stopColor="#96be25" />
+                    </linearGradient>
+                    <linearGradient
+                      id="processedGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="0%" stopColor="#96be25" />
+                      <stop offset="100%" stopColor="#2596be" />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </ChartCard>
 
           {/* Document Types */}
-          <ChartCard title="Document Types">
-            <div className="space-y-3">
-              {Object.entries(analytics.documentTypes).map(([type, count]) => (
-                <div key={type} className="flex items-center justify-between">
-                  <span
-                    className={`text-sm font-medium ${
-                      isDarkMode ? "text-gray-200" : "text-gray-900"
-                    } capitalize`}
+          <ChartCard title="Document Types Distribution">
+            <div className="w-full h-40 sm:h-48 md:h-72 flex items-center justify-center flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={Object.entries(analytics.documentTypes).map(
+                      ([type, count]) => ({ name: type, value: count })
+                    )}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={window.innerWidth < 640 ? 60 : 90}
+                    innerRadius={window.innerWidth < 640 ? 30 : 50}
+                    paddingAngle={2}
+                    label={({ name, percent }) =>
+                      window.innerWidth < 640
+                        ? `${(percent * 100).toFixed(0)}%`
+                        : `${name} ${(percent * 100).toFixed(1)}%`
+                    }
                   >
-                    {type}
-                  </span>
-                  <div className="flex items-center">
-                    <div
-                      className={`w-32 ${
-                        isDarkMode ? "bg-gray-600" : "bg-gray-200"
-                      } rounded-full h-2 mr-3`}
-                    >
-                      <div
-                        className="bg-primary-custom h-2 rounded-full"
-                        style={{
-                          width: `${(count / analytics.totalDocuments) * 100}%`,
-                        }}
-                      ></div>
-                    </div>
-                    <span
-                      className={`text-sm ${
-                        isDarkMode ? "text-gray-300" : "text-gray-600"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                    {Object.entries(analytics.documentTypes).map(
+                      (entry, idx) => (
+                        <Cell
+                          key={`cell-${idx}`}
+                          fill={idx % 2 === 0 ? "#2596be" : "#96be25"}
+                        />
+                      )
+                    )}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: isDarkMode ? "#222" : "#fff",
+                      borderRadius: 8,
+                      border: "none",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "10px" }} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </ChartCard>
         </div>
 
         {/* OASIS Scores and Clinical Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
           {/* OASIS Scores */}
           <ChartCard title="OASIS Score Trends">
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-3 md:space-y-4 overflow-y-auto flex-1">
               {analytics.oasisScores.map((score, index) => (
                 <div
                   key={index}
                   className={`border ${
                     isDarkMode ? "border-gray-600" : "border-gray-200"
-                  } rounded-lg p-4`}
+                  } rounded-lg p-2 sm:p-3 md:p-4`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <h4
-                        className={`font-medium ${
+                        className={`font-medium text-sm sm:text-base truncate ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
                         {score.item}
                       </h4>
                       <p
-                        className={`text-sm ${
+                        className={`text-xs sm:text-sm truncate ${
                           isDarkMode ? "text-gray-300" : "text-gray-600"
                         }`}
                       >
                         {score.description}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <p
-                        className={`text-lg font-bold ${
+                        className={`text-base sm:text-lg font-bold ${
                           isDarkMode ? "text-white" : "text-gray-900"
                         }`}
                       >
                         {score.averageScore}
                       </p>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
+                        className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full inline-block ${
                           score.trend === "improving"
-                            ? "bg-green-100 text-green-800"
+                            ? isDarkMode
+                              ? "bg-green-900 bg-opacity-30 text-green-300"
+                              : "bg-green-100 text-green-800"
                             : score.trend === "declining"
-                            ? "bg-red-100 text-red-800"
+                            ? isDarkMode
+                              ? "bg-red-900 bg-opacity-30 text-red-300"
+                              : "bg-red-100 text-red-800"
                             : isDarkMode
                             ? "bg-gray-700 text-gray-300"
                             : "bg-gray-100 text-gray-800"
@@ -447,38 +537,60 @@ const AnalyticsView = ({ selectedPatient }) => {
 
           {/* Clinical Insights */}
           <ChartCard title="Clinical Insights">
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3 overflow-y-auto flex-1">
               {analytics.clinicalInsights.map((insight, index) => (
                 <div
                   key={index}
-                  className={`p-4 rounded-lg border-l-4 ${
+                  className={`p-2 sm:p-3 md:p-4 rounded-lg border-l-4 ${
                     insight.priority === "high"
-                      ? "bg-red-50 border-red-400"
+                      ? isDarkMode
+                        ? "bg-red-900 bg-opacity-20 border-red-500"
+                        : "bg-red-50 border-red-400"
                       : insight.priority === "medium"
-                      ? "bg-yellow-50 border-yellow-400"
+                      ? isDarkMode
+                        ? "bg-yellow-900 bg-opacity-20 border-yellow-500"
+                        : "bg-yellow-50 border-yellow-400"
+                      : isDarkMode
+                      ? "bg-blue-900 bg-opacity-20 border-blue-500"
                       : "bg-blue-50 border-blue-400"
                   }`}
                 >
-                  <div className="flex items-start">
+                  <div className="flex items-start gap-2 sm:gap-3">
                     <div
-                      className={`p-1 rounded-full mr-3 ${
+                      className={`p-1 rounded-full flex-shrink-0 ${
                         insight.type === "risk"
-                          ? "bg-red-100"
+                          ? isDarkMode
+                            ? "bg-red-900 bg-opacity-50"
+                            : "bg-red-100"
                           : insight.type === "improvement"
-                          ? "bg-green-100"
+                          ? isDarkMode
+                            ? "bg-green-900 bg-opacity-50"
+                            : "bg-green-100"
                           : insight.type === "alert"
-                          ? "bg-yellow-100"
+                          ? isDarkMode
+                            ? "bg-yellow-900 bg-opacity-50"
+                            : "bg-yellow-100"
+                          : isDarkMode
+                          ? "bg-blue-900 bg-opacity-50"
                           : "bg-blue-100"
                       }`}
                     >
                       <svg
-                        className={`w-4 h-4 ${
+                        className={`w-3 h-3 sm:w-4 sm:h-4 ${
                           insight.type === "risk"
-                            ? "text-red-600"
+                            ? isDarkMode
+                              ? "text-red-400"
+                              : "text-red-600"
                             : insight.type === "improvement"
-                            ? "text-green-600"
+                            ? isDarkMode
+                              ? "text-green-400"
+                              : "text-green-600"
                             : insight.type === "alert"
-                            ? "text-yellow-600"
+                            ? isDarkMode
+                              ? "text-yellow-400"
+                              : "text-yellow-600"
+                            : isDarkMode
+                            ? "text-blue-400"
                             : "text-blue-600"
                         }`}
                         fill="none"
@@ -501,22 +613,28 @@ const AnalyticsView = ({ selectedPatient }) => {
                         />
                       </svg>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-medium ${
+                        className={`text-xs sm:text-sm font-medium break-words ${
                           insight.priority === "high"
-                            ? "text-red-800"
+                            ? isDarkMode
+                              ? "text-red-300"
+                              : "text-red-800"
                             : insight.priority === "medium"
-                            ? "text-yellow-800"
+                            ? isDarkMode
+                              ? "text-yellow-300"
+                              : "text-yellow-800"
+                            : isDarkMode
+                            ? "text-blue-300"
                             : "text-blue-800"
                         }`}
                       >
                         {insight.message}
                       </p>
                       <p
-                        className={`text-xs ${
+                        className={`text-[10px] sm:text-xs ${
                           isDarkMode ? "text-gray-400" : "text-gray-600"
-                        } mt-1 capitalize`}
+                        } mt-0.5 sm:mt-1 capitalize`}
                       >
                         {insight.priority} priority • {insight.type}
                       </p>
@@ -530,30 +648,33 @@ const AnalyticsView = ({ selectedPatient }) => {
 
         {/* Patient Activity */}
         <ChartCard title="Most Active Patients">
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3 overflow-y-auto flex-1">
             {analytics.patientActivity.map((patient, index) => (
               <div
                 key={index}
-                className={`flex items-center justify-between p-3 ${
+                className={`flex items-center justify-between p-2 sm:p-3 ${
                   isDarkMode ? "bg-gray-700" : "bg-gray-50"
                 } rounded-lg`}
               >
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-primary-custom rounded-full flex items-center justify-center mr-3">
-                    <span className="text-white text-sm font-medium">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: "#2596be" }}
+                  >
+                    <span className="text-white text-xs sm:text-sm font-medium">
                       {patient.name.charAt(0)}
                     </span>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p
-                      className={`font-medium ${
+                      className={`font-medium text-sm sm:text-base truncate ${
                         isDarkMode ? "text-white" : "text-gray-900"
                       }`}
                     >
                       {patient.name}
                     </p>
                     <p
-                      className={`text-sm ${
+                      className={`text-[10px] sm:text-sm truncate ${
                         isDarkMode ? "text-gray-400" : "text-gray-500"
                       }`}
                     >
@@ -562,12 +683,15 @@ const AnalyticsView = ({ selectedPatient }) => {
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-primary-custom">
+                <div className="text-right flex-shrink-0 ml-2">
+                  <p
+                    className="text-base sm:text-lg font-bold"
+                    style={{ color: "#2596be" }}
+                  >
                     {patient.documents}
                   </p>
                   <p
-                    className={`text-xs ${
+                    className={`text-[10px] sm:text-xs ${
                       isDarkMode ? "text-gray-400" : "text-gray-500"
                     }`}
                   >

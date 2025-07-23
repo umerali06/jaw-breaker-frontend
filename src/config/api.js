@@ -12,7 +12,9 @@ export const API_ENDPOINTS = {
     LOGOUT: `${API_BASE_URL}/api/auth/logout`,
   },
   UPLOAD: `${API_BASE_URL}/api/upload`,
+  FILES: `${API_BASE_URL}/api/upload`, // Alias for UPLOAD for better semantics
   AI: `${API_BASE_URL}/api/ai`,
+  PATIENTS: `${API_BASE_URL}/api/patients`,
 };
 
 export default API_BASE_URL;

@@ -19,9 +19,10 @@ const DashboardPage = () => {
   // Handle responsive sidebar behavior
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      // Collapse sidebar when screen width is below 1024px
+      if (window.innerWidth < 1024) {
         setIsSidebarCollapsed(true);
-      } else if (window.innerWidth >= 1024) {
+      } else {
         setIsSidebarCollapsed(false);
       }
     };
@@ -33,26 +34,37 @@ const DashboardPage = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Close chat panel on small screens when sidebar is opened
+  useEffect(() => {
+    if (!isSidebarCollapsed && window.innerWidth < 768 && isChatOpen) {
+      setIsChatOpen(false);
+    }
+  }, [isSidebarCollapsed, isChatOpen]);
+
   return (
     <PatientDataProvider>
       <div
-        className={`h-screen ${
+        className={`h-screen w-full ${
           isDarkMode ? "bg-gray-900" : "bg-gray-50"
         } flex overflow-hidden relative`}
+        style={{ maxWidth: "100vw", overflowX: "hidden" }}
       >
         {/* Mobile Sidebar Overlay */}
         {!isSidebarCollapsed && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
             onClick={() => setIsSidebarCollapsed(true)}
+            style={{ touchAction: "none" }}
           />
         )}
 
         {/* Sidebar */}
         <div
           className={`${
-            isSidebarCollapsed ? "" : "fixed md:relative"
-          } z-50 md:z-auto h-full`}
+            isSidebarCollapsed ? "hidden lg:block" : "block"
+          } z-50 lg:z-auto h-full transition-all duration-300 ${
+            !isSidebarCollapsed && "fixed lg:relative left-0 top-0"
+          }`}
         >
           <Sidebar
             activeView={activeView}
@@ -67,7 +79,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col w-full overflow-y-auto overflow-x-hidden">
           <MainContent
             activeView={activeView}
             selectedPatient={selectedPatient}
@@ -79,12 +91,14 @@ const DashboardPage = () => {
           />
         </div>
 
-        {/* AI Chat Panel */}
+        {/* AI Chat Panel - Responsive positioning */}
         {isChatOpen && (
-          <ChatPanel
-            selectedPatient={selectedPatient}
-            onClose={() => setIsChatOpen(false)}
-          />
+          <div className="fixed right-0 top-0 h-full z-40 lg:relative lg:z-auto">
+            <ChatPanel
+              selectedPatient={selectedPatient}
+              onClose={() => setIsChatOpen(false)}
+            />
+          </div>
         )}
 
         {/* File Upload Modal */}
