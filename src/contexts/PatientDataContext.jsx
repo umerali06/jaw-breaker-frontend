@@ -197,7 +197,7 @@ const PatientDataProvider = ({ children }) => {
     setError(null);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("/api/patients", {
+      const response = await fetch(API_ENDPOINTS.PATIENTS, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -235,7 +235,7 @@ const PatientDataProvider = ({ children }) => {
     setError(null);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("/api/patients", {
+      const response = await fetch(API_ENDPOINTS.PATIENTS, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -258,11 +258,11 @@ const PatientDataProvider = ({ children }) => {
 
   // Edit/update a patient in backend
   const editPatient = async (id, updatedInfo) => {
-      setLoading(true);
+    setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/patients/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.PATIENTS}/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -289,7 +289,7 @@ const PatientDataProvider = ({ children }) => {
     setError(null);
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`/api/patients/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.PATIENTS}/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -312,7 +312,7 @@ const PatientDataProvider = ({ children }) => {
   const getPatientStats = async () => {
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("/api/patients/stats", {
+      const response = await fetch(`${API_ENDPOINTS.PATIENTS}/stats`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -338,11 +338,14 @@ const PatientDataProvider = ({ children }) => {
       if (filters.page) params.append("page", filters.page);
       if (filters.limit) params.append("limit", filters.limit);
 
-      const response = await fetch(`/api/patients?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_ENDPOINTS.PATIENTS}?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await response.json();
       if (!data.success)
         throw new Error(data.message || "Failed to search patients");
