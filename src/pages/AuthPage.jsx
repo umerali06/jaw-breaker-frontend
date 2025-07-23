@@ -82,13 +82,13 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
+      <div className="w-full max-w-sm mx-auto sm:max-w-md lg:max-w-lg xl:max-w-xl">
+        <div className="text-center mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-3">
             {isLogin ? "Sign in to your account" : "Create your account"}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600 px-2">
             {isLogin
               ? "Welcome back! Please sign in to continue."
               : "Join us to start processing your documents with AI."}
@@ -96,15 +96,15 @@ const AuthPage = () => {
         </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-lg sm:rounded-lg sm:px-10">
+      <div className="w-full max-w-sm mx-auto sm:max-w-md lg:max-w-lg xl:max-w-xl">
+        <div className="bg-white py-6 px-4 shadow-xl rounded-lg sm:py-8 sm:px-6 lg:py-10 lg:px-8 xl:px-10">
           {/* Error Display */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-md">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg
-                    className="h-5 w-5 text-red-400"
+                    className="h-4 w-4 sm:h-5 sm:w-5 text-red-400"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -115,8 +115,8 @@ const AuthPage = () => {
                     />
                   </svg>
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-800">{error}</p>
+                <div className="ml-2 sm:ml-3">
+                  <p className="text-xs sm:text-sm text-red-800">{error}</p>
                 </div>
               </div>
             </div>
@@ -130,12 +130,12 @@ const AuthPage = () => {
           />
 
           {/* Divider */}
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
               </div>
-              <div className="relative flex justify-center text-sm">
+              <div className="relative flex justify-center text-xs sm:text-sm">
                 <span className="px-2 bg-white text-gray-500">
                   Or continue with
                 </span>
@@ -144,7 +144,7 @@ const AuthPage = () => {
           </div>
 
           {/* Auth Forms */}
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             {isLogin ? (
               <LoginForm
                 onSuccess={handleAuthSuccess}
@@ -163,12 +163,12 @@ const AuthPage = () => {
           </div>
 
           {/* Toggle Mode */}
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             <div className="text-center">
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-sm text-primary-custom hover:text-opacity-80 font-medium"
+                className="text-xs sm:text-sm text-primary-custom hover:text-opacity-80 font-medium transition-colors duration-200"
                 disabled={loading}
               >
                 {isLogin
@@ -181,19 +181,19 @@ const AuthPage = () => {
       </div>
 
       {/* Footer */}
-      <div className="mt-8 text-center">
-        <p className="text-sm text-gray-600">
+      <div className="mt-6 sm:mt-8 text-center px-4">
+        <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
           By continuing, you agree to our{" "}
           <a
             href="/terms"
-            className="text-primary-custom hover:text-opacity-80"
+            className="text-primary-custom hover:text-opacity-80 underline"
           >
             Terms of Service
           </a>{" "}
           and{" "}
           <a
             href="/privacy"
-            className="text-primary-custom hover:text-opacity-80"
+            className="text-primary-custom hover:text-opacity-80 underline"
           >
             Privacy Policy
           </a>
