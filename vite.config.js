@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      "/api": "https://jaw-breaker-backend.onrender.com",
+      "/api": {
+        target: "https://jaw-breaker-backend.onrender.com",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   test: {
