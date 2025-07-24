@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const CTA = () => {
   return (
     <section
@@ -21,9 +23,9 @@ const CTA = () => {
             improving quality with Jawbreaker.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <button className="btn-custom btn-white-custom">
-              Request a Demo
-            </button>
+            <Link to="/auth" className="btn-custom btn-white-custom">
+              Try Demo
+            </Link>
             <button
               className="btn-custom btn-secondary-custom"
               onClick={() =>

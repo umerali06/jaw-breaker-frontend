@@ -140,8 +140,8 @@ const HomePage = () => {
 
   // Navigation actions
   const navActions = [
-    { label: "Login", to: "/login", variant: "outline" },
-    { label: "Sign Up", to: "/signup", variant: "accent" },
+    { label: "Login", to: "/auth", variant: "outline" },
+    { label: "Sign Up", to: "/auth", variant: "accent" },
   ];
 
   // Features data
@@ -272,7 +272,7 @@ const HomePage = () => {
       <Hero
         title="AI-Powered Clinical Documentation Assistant"
         subtitle="Streamline your clinical documentation process with our advanced AI technology. Save time, reduce errors, and improve patient care."
-        primaryCTA={{ label: "Get Started", to: "/signup" }}
+        primaryCTA={{ label: "Try Demo", to: "/auth" }}
         secondaryCTA={{ label: "Learn More", to: "#features" }}
         image={<HeroImage />}
       />
@@ -306,7 +306,7 @@ const HomePage = () => {
         title="Ready to streamline your clinical documentation?"
         subtitle="Join thousands of healthcare professionals who are saving time and improving accuracy with Jawbreaker."
         buttonText="Get Started Now"
-        buttonLink="/signup"
+        buttonLink="/auth"
       />
 
       {/* Footer */}

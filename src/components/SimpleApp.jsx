@@ -39,10 +39,10 @@ const SimpleApp = () => {
 
           <div className="flex justify-center mb-12 sm:mb-16">
             <Link
-              to="/demo"
+              to="/auth"
               className="inline-block px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-medium rounded-full bg-primary-custom text-white hover:bg-opacity-90 transition-all duration-300 shadow-md"
             >
-              See our demo
+              Try Demo
             </Link>
           </div>
 

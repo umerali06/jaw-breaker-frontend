@@ -70,7 +70,7 @@ const AnalyticsView = () => {
   const [selectedView, setSelectedView] = useState("overview");
   const [isCalculating, setIsCalculating] = useState(false);
 
-  // Define getOASISDescription function before it's used in the useMemo hook
+  // OASIS description helper function
   const getOASISDescription = (item) => {
     const descriptions = {
       M1830: "Bathing",
@@ -379,7 +379,6 @@ const AnalyticsView = () => {
       processingStatus,
     };
   }, [files, patients, timeRange, loading]);
-
 
   // Premium Metric Card Component
   const MetricCard = ({

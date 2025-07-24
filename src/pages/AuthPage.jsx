@@ -82,22 +82,37 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
-      <div className="w-full max-w-sm mx-auto sm:max-w-md lg:max-w-lg xl:max-w-xl">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col justify-center px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full max-w-xs mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg">
         <div className="text-center mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-3">
-            {isLogin ? "Sign in to your account" : "Create your account"}
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center">
+              <svg
+                className="w-6 h-6 sm:w-8 sm:h-8 text-white"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            {isLogin ? "Welcome back" : "Get started"}
           </h2>
-          <p className="text-sm sm:text-base text-gray-600 px-2">
+          <p className="text-sm sm:text-base text-gray-600 max-w-sm mx-auto">
             {isLogin
-              ? "Welcome back! Please sign in to continue."
-              : "Join us to start processing your documents with AI."}
+              ? "Sign in to access your AI-powered clinical dashboard"
+              : "Create your account to start analyzing documents with AI"}
           </p>
         </div>
       </div>
 
-      <div className="w-full max-w-sm mx-auto sm:max-w-md lg:max-w-lg xl:max-w-xl">
-        <div className="bg-white py-6 px-4 shadow-xl rounded-lg sm:py-8 sm:px-6 lg:py-10 lg:px-8 xl:px-10">
+      <div className="w-full max-w-xs mx-auto sm:max-w-sm md:max-w-md lg:max-w-lg">
+        <div className="bg-white py-6 px-4 shadow-2xl rounded-2xl border border-gray-100 sm:py-8 sm:px-6 md:px-8 lg:px-10">
           {/* Error Display */}
           {error && (
             <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-md">
@@ -122,29 +137,8 @@ const AuthPage = () => {
             </div>
           )}
 
-          {/* Google Auth Button */}
-          <GoogleAuthButton
-            onAuth={handleGoogleAuth}
-            loading={loading}
-            disabled={loading}
-          />
-
-          {/* Divider */}
-          <div className="mt-4 sm:mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-xs sm:text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Auth Forms */}
-          <div className="mt-4 sm:mt-6">
+          <div>
             {isLogin ? (
               <LoginForm
                 onSuccess={handleAuthSuccess}
@@ -160,6 +154,29 @@ const AuthPage = () => {
                 setLoading={setLoading}
               />
             )}
+          </div>
+
+          {/* Divider */}
+          <div className="mt-6 sm:mt-8">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-xs sm:text-sm">
+                <span className="px-2 bg-white text-gray-500">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Google Auth Button */}
+          <div className="mt-4 sm:mt-6">
+            <GoogleAuthButton
+              onAuth={handleGoogleAuth}
+              loading={loading}
+              disabled={loading}
+            />
           </div>
 
           {/* Toggle Mode */}
