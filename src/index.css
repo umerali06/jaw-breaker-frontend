@@ -170,6 +170,12 @@ body {
     @apply px-4 mx-auto max-w-7xl;
   }
 
+  /* Responsive grid for patient cards */
+  .grid-auto-fit {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
   .card-hover {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -322,7 +328,7 @@ body {
 
 /* Blue background for sections */
 .bg-blue-50 {
-  background-color: #f0f7ff !important;
+  background-color: #f0f7ff;
 }
 
 /* Custom button styles */
@@ -428,13 +434,13 @@ textarea {
   background: linear-gradient(135deg, #2596be 60%, #96be25 100%);
   border-radius: 8px;
   min-height: 40px;
-  box-shadow: 0 2px 8px rgba(37, 150, 190, 0.08);
+  box-shadow: 0 2px 8px rgba(37,150,190,0.08);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #2596be 80%, #96be25 100%);
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0,0,0,0.03);
   border-radius: 8px;
 }
 

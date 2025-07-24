@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "use:dev": "node switch-env.cjs dev",
+    "use:prod": "node switch-env.ccjs prod"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",

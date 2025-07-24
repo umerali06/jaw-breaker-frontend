@@ -45,11 +45,17 @@ const OverviewView = ({
     recentActivity: 0,
     pendingAnalysis: 0,
     criticalFindings: 0,
+    completedAnalysis: 0,
+    failedAnalysis: 0,
+    totalInsights: 0,
+    highPriorityInsights: 0,
   });
 
   const [recentFiles, setRecentFiles] = useState([]);
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
   const [showFileSelect, setShowFileSelect] = useState(false);
+  const [dynamicInsights, setDynamicInsights] = useState([]);
+  const [activityData, setActivityData] = useState([]);
 
   const handleGenerateSOAPClick = (patient) => {
     console.log("handleGenerateSOAPClick called", patient);
@@ -123,35 +129,113 @@ const OverviewView = ({
     // In a real implementation, this would navigate to the file detail page
   };
 
-  // Calculate statistics and recent files
+  // Calculate dynamic statistics and insights from real data
   useEffect(() => {
-    // Calculate statistics
-    const criticalFiles = files.filter(
-      (file) => file.analysisResults?.severity === "critical"
-    ).length;
+    // Debug logging to understand data structure
+    console.log("=== OVERVIEW DEBUG ===");
+    console.log("Total files:", files.length);
+    console.log("Files data:", files);
+    console.log("Selected patient:", selectedPatient);
+    console.log("Patients data:", patients);
 
+    // Log clinical insights specifically
+    files.forEach((file, index) => {
+      console.log(`File ${index + 1} (${file.originalname}):`, {
+        processingStatus: file.processingStatus,
+        clinicalInsights: file.clinicalInsights,
+        aiSummary: file.aiSummary,
+        patientId: file.patientId,
+        patientName: file.patientName,
+      });
+    });
+
+    // Calculate comprehensive statistics from real data
+    const completedFiles = files.filter(
+      (file) => file.processingStatus === "completed"
+    );
+    const pendingFiles = files.filter(
+      (file) =>
+        file.processingStatus === "pending" ||
+        file.processingStatus === "processing"
+    );
+    const failedFiles = files.filter(
+      (file) => file.processingStatus === "failed"
+    );
+
+    // Get all clinical insights from completed files
+    const allInsights = [];
+    completedFiles.forEach((file) => {
+      if (file.clinicalInsights && Array.isArray(file.clinicalInsights)) {
+        file.clinicalInsights.forEach((insight) => {
+          allInsights.push({
+            ...insight,
+            fileName: file.originalname,
+            patientName: file.patientName,
+            fileId: file._id,
+            createdAt: file.createdAt,
+          });
+        });
+      }
+    });
+
+    // Count critical findings from insights
+    const criticalInsights = allInsights.filter(
+      (insight) =>
+        insight.priority === "critical" || insight.priority === "high"
+    );
+
+    // Calculate recent activity (last 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentActivity = files.filter((file) => {
+      const fileDate = new Date(file.createdAt);
+      return fileDate > weekAgo;
+    }).length;
+
+    // Update stats with real data
     setStats({
       totalPatients: patients.length,
       totalDocuments: files.length,
-      recentActivity: files.filter((file) => {
-        const fileDate = new Date(file.createdAt);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return fileDate > weekAgo;
-      }).length,
-      pendingAnalysis: files.filter(
-        (file) =>
-          file.processingStatus === "pending" ||
-          file.processingStatus === "processing"
-      ).length,
-      criticalFindings: criticalFiles,
+      recentActivity,
+      pendingAnalysis: pendingFiles.length,
+      criticalFindings: criticalInsights.length,
+      completedAnalysis: completedFiles.length,
+      failedAnalysis: failedFiles.length,
+      totalInsights: allInsights.length,
+      highPriorityInsights: criticalInsights.length,
     });
 
-    // Set recent files
+    // Set dynamic insights (top 10 most recent critical/high priority)
+    const sortedInsights = criticalInsights
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 10);
+    setDynamicInsights(sortedInsights);
+
+    // Set recent files with analysis status
     const sortedFiles = [...files].sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     );
     setRecentFiles(sortedFiles.slice(0, 5));
+
+    // Create activity timeline data
+    const activityTimeline = files
+      .filter((file) => file.processingCompleted || file.createdAt)
+      .map((file) => ({
+        id: file._id,
+        type:
+          file.processingStatus === "completed"
+            ? "analysis_completed"
+            : "document_uploaded",
+        fileName: file.originalname,
+        patientName: file.patientName,
+        timestamp: file.processingCompleted || file.createdAt,
+        status: file.processingStatus,
+        insightCount: file.clinicalInsights ? file.clinicalInsights.length : 0,
+      }))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 10);
+
+    setActivityData(activityTimeline);
   }, [patients, files]);
 
   // Premium StatCard Component with improved design
@@ -572,38 +656,233 @@ const OverviewView = ({
               </div>
             </div>
 
-            {/* Patient Stats */}
+            {/* Dynamic Patient Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <StatCard
                 title="Documents"
                 value={selectedPatient?.files?.length || 0}
                 icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 color="primary"
-                trend={{ value: 12, label: "increase", comparison: "8" }}
               />
               <StatCard
-                title="Conditions"
-                value={selectedPatient.conditions?.length || 2}
-                icon="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                title="AI Insights"
+                value={(selectedPatient?.files || []).reduce(
+                  (total, file) =>
+                    total +
+                    (file.clinicalInsights ? file.clinicalInsights.length : 0),
+                  0
+                )}
+                icon="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                 color="secondary"
               />
               <StatCard
-                title="Medications"
-                value={selectedPatient.medications?.length || 4}
-                icon="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
-                color="accent"
-              />
-              <StatCard
                 title="Critical Findings"
-                value={
-                  (selectedPatient?.files || []).filter(
-                    (f) => f.analysisResults?.severity === "critical"
-                  ).length
-                }
+                value={(selectedPatient?.files || []).reduce((total, file) => {
+                  if (!file.clinicalInsights) return total;
+                  return (
+                    total +
+                    file.clinicalInsights.filter(
+                      (insight) =>
+                        insight.priority === "critical" ||
+                        insight.priority === "high"
+                    ).length
+                  );
+                }, 0)}
                 icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 color="danger"
               />
+              <StatCard
+                title="Analysis Status"
+                value={`${
+                  (selectedPatient?.files || []).filter(
+                    (f) => f.processingStatus === "completed"
+                  ).length
+                }/${selectedPatient?.files?.length || 0}`}
+                icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                color="accent"
+              />
             </div>
+
+            {/* Dynamic Insights Panel */}
+            {(() => {
+              const hasInsights = (selectedPatient?.files || []).some(
+                (file) =>
+                  file.clinicalInsights && file.clinicalInsights.length > 0
+              );
+              console.log("=== PATIENT INSIGHTS DEBUG ===");
+              console.log("Selected patient files:", selectedPatient?.files);
+              console.log("Has insights:", hasInsights);
+              (selectedPatient?.files || []).forEach((file, index) => {
+                console.log(`Patient file ${index + 1}:`, {
+                  name: file.originalname,
+                  clinicalInsights: file.clinicalInsights,
+                  insightCount: file.clinicalInsights
+                    ? file.clinicalInsights.length
+                    : 0,
+                });
+              });
+              return hasInsights;
+            })() && (
+              <div
+                className="rounded-xl p-3 sm:p-6 transition-all duration-300"
+                style={{
+                  background: isDarkMode ? BRAND.dark : BRAND.white,
+                  border: `1px solid ${
+                    isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+                  }`,
+                }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h4
+                    className="text-base sm:text-lg font-semibold flex items-center"
+                    style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+                  >
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                    Clinical Insights
+                  </h4>
+                  <span
+                    className="text-xs px-2 py-1 rounded-full"
+                    style={{
+                      background: isDarkMode ? "#2d3748" : "#f1f3f4",
+                      color: isDarkMode ? "#9aa0a6" : "#5f6368",
+                    }}
+                  >
+                    {(selectedPatient?.files || []).reduce(
+                      (total, file) =>
+                        total +
+                        (file.clinicalInsights
+                          ? file.clinicalInsights.length
+                          : 0),
+                      0
+                    )}{" "}
+                    insights
+                  </span>
+                </div>
+
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {(selectedPatient?.files || [])
+                    .flatMap((file) =>
+                      (file.clinicalInsights || []).map((insight) => ({
+                        ...insight,
+                        fileName: file.originalname,
+                        fileId: file._id,
+                      }))
+                    )
+                    .sort((a, b) => {
+                      const priorityOrder = {
+                        critical: 4,
+                        high: 3,
+                        medium: 2,
+                        low: 1,
+                      };
+                      return (
+                        (priorityOrder[b.priority] || 0) -
+                        (priorityOrder[a.priority] || 0)
+                      );
+                    })
+                    .slice(0, 8)
+                    .map((insight, index) => (
+                      <div
+                        key={`${insight.fileId}-${index}`}
+                        className="p-3 rounded-lg transition-all duration-200"
+                        style={{
+                          background: isDarkMode ? "#2d3748" : "#f8f9fa",
+                          border: `1px solid ${
+                            isDarkMode
+                              ? "rgba(255,255,255,0.1)"
+                              : "rgba(0,0,0,0.05)"
+                          }`,
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                insight.priority === "critical"
+                                  ? "text-red-600"
+                                  : insight.priority === "high"
+                                  ? "text-orange-600"
+                                  : insight.priority === "medium"
+                                  ? "text-yellow-600"
+                                  : "text-blue-600"
+                              }`}
+                              style={{
+                                backgroundColor: isDarkMode
+                                  ? insight.priority === "critical"
+                                    ? "rgba(211,47,47,0.2)"
+                                    : insight.priority === "high"
+                                    ? "rgba(255,152,0,0.2)"
+                                    : insight.priority === "medium"
+                                    ? "rgba(255,193,7,0.2)"
+                                    : "rgba(33,150,243,0.2)"
+                                  : insight.priority === "critical"
+                                  ? "rgba(211,47,47,0.1)"
+                                  : insight.priority === "high"
+                                  ? "rgba(255,152,0,0.1)"
+                                  : insight.priority === "medium"
+                                  ? "rgba(255,193,7,0.1)"
+                                  : "rgba(33,150,243,0.1)",
+                              }}
+                            >
+                              {insight.priority}
+                            </span>
+                            <span
+                              className="text-xs px-2 py-1 rounded-full"
+                              style={{
+                                background: isDarkMode ? "#374151" : "#e5e7eb",
+                                color: isDarkMode ? "#9ca3af" : "#6b7280",
+                              }}
+                            >
+                              {insight.type}
+                            </span>
+                          </div>
+                        </div>
+                        <p
+                          className="text-sm mb-2"
+                          style={{
+                            color: isDarkMode ? BRAND.white : BRAND.dark,
+                          }}
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              insight.message?.replace(
+                                /\*\*(.*?)\*\*/g,
+                                "<strong>$1</strong>"
+                              ) || "No details available",
+                          }}
+                        />
+                        {insight.evidence && (
+                          <p
+                            className="text-xs"
+                            style={{
+                              color: isDarkMode ? "#9aa0a6" : "#5f6368",
+                            }}
+                          >
+                            Evidence: {insight.evidence}
+                          </p>
+                        )}
+                        <p
+                          className="text-xs mt-1"
+                          style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                        >
+                          From: {insight.fileName}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Patient Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -1077,7 +1356,31 @@ const OverviewView = ({
                           d="M13 10V3L4 14h7v7l9-11h-7z"
                         />
                       </svg>
-                      Updated 5 min ago
+                      {(() => {
+                        const latestFile = (selectedPatient?.files || [])
+                          .filter((f) => f.processingCompleted)
+                          .sort(
+                            (a, b) =>
+                              new Date(b.processingCompleted) -
+                              new Date(a.processingCompleted)
+                          )[0];
+
+                        if (latestFile) {
+                          const timeDiff =
+                            Date.now() -
+                            new Date(latestFile.processingCompleted).getTime();
+                          const minutes = Math.floor(timeDiff / (1000 * 60));
+                          const hours = Math.floor(minutes / 60);
+                          const days = Math.floor(hours / 24);
+
+                          if (days > 0) return `Updated ${days}d ago`;
+                          if (hours > 0) return `Updated ${hours}h ago`;
+                          if (minutes > 0) return `Updated ${minutes}m ago`;
+                          return "Updated just now";
+                        }
+
+                        return "No recent updates";
+                      })()}
                     </span>
                   </div>
 
@@ -1181,8 +1484,54 @@ const OverviewView = ({
                               color: isDarkMode ? "#cbd5e1" : "#475569",
                             }}
                           >
-                            {selectedPatient.aiInsights?.summary ||
-                              "Based on recent documentation, patient shows stable vital signs with ongoing management of chronic conditions. Blood pressure trends indicate mild hypertension requiring continued monitoring. Recent lab results show improved lipid profile but slightly elevated HbA1c at 6.8%."}
+                            {(() => {
+                              // Get the most recent file with AI summary
+                              const filesWithSummary = (
+                                selectedPatient?.files || []
+                              )
+                                .filter((file) => file.aiSummary)
+                                .sort(
+                                  (a, b) =>
+                                    new Date(b.createdAt) -
+                                    new Date(a.createdAt)
+                                );
+
+                              if (filesWithSummary.length > 0) {
+                                return filesWithSummary[0].aiSummary;
+                              }
+
+                              // If no AI summary, generate one from clinical insights
+                              const allInsights = (selectedPatient?.files || [])
+                                .flatMap((file) => file.clinicalInsights || [])
+                                .filter((insight) => insight.message);
+
+                              if (allInsights.length > 0) {
+                                const criticalInsights = allInsights.filter(
+                                  (i) =>
+                                    i.priority === "critical" ||
+                                    i.priority === "high"
+                                );
+                                const summaryInsights =
+                                  criticalInsights.length > 0
+                                    ? criticalInsights.slice(0, 3)
+                                    : allInsights.slice(0, 3);
+                                return `Clinical analysis reveals: ${summaryInsights
+                                  .map((i) =>
+                                    i.message.replace(/\*\*(.*?)\*\*/g, "$1")
+                                  )
+                                  .join(". ")}.`;
+                              }
+
+                              return `Patient ${selectedPatient.name} has ${
+                                selectedPatient?.files?.length || 0
+                              } document(s) uploaded. ${
+                                (selectedPatient?.files || []).filter(
+                                  (f) => f.processingStatus === "completed"
+                                ).length > 0
+                                  ? "Analysis completed for recent documents."
+                                  : "Analysis pending for uploaded documents."
+                              }`;
+                            })()}
                           </p>
                         </div>
                       </div>
@@ -1289,15 +1638,100 @@ const OverviewView = ({
                               color: isDarkMode ? "#cbd5e1" : "#475569",
                             }}
                           >
-                            {(
-                              selectedPatient.aiInsights?.recommendations || [
-                                "Continue current medication regimen with Metformin 500mg BID",
-                                "Schedule follow-up in 2 weeks to reassess HbA1c levels",
-                                "Recommend dietary consultation for diabetes management",
-                                "Consider adding statin therapy given family history of CVD",
-                                "Monitor blood pressure trends with weekly home measurements",
-                              ]
-                            ).map((rec, i) => (
+                            {(() => {
+                              // Get recommendations from clinical insights
+                              const allInsights = (selectedPatient?.files || [])
+                                .flatMap((file) => file.clinicalInsights || [])
+                                .filter(
+                                  (insight) =>
+                                    insight.type === "recommendation" ||
+                                    insight.recommendation
+                                );
+
+                              if (allInsights.length > 0) {
+                                return allInsights
+                                  .slice(0, 5)
+                                  .map(
+                                    (insight) =>
+                                      insight.recommendation ||
+                                      insight.message.replace(
+                                        /\*\*(.*?)\*\*/g,
+                                        "$1"
+                                      )
+                                  );
+                              }
+
+                              // Get care goals from files
+                              const careGoals = (selectedPatient?.files || [])
+                                .flatMap((file) => file.careGoals || [])
+                                .slice(0, 5);
+
+                              if (careGoals.length > 0) {
+                                return careGoals;
+                              }
+
+                              // Get interventions from files
+                              const interventions = (
+                                selectedPatient?.files || []
+                              )
+                                .flatMap((file) => file.interventions || [])
+                                .slice(0, 5);
+
+                              if (interventions.length > 0) {
+                                return interventions;
+                              }
+
+                              // Default recommendations based on patient data
+                              const recommendations = [];
+                              if ((selectedPatient?.files || []).length > 0) {
+                                recommendations.push(
+                                  "Review recent documentation for care plan updates"
+                                );
+                                recommendations.push(
+                                  "Continue monitoring patient progress"
+                                );
+
+                                const completedAnalysis = (
+                                  selectedPatient?.files || []
+                                ).filter(
+                                  (f) => f.processingStatus === "completed"
+                                ).length;
+                                if (completedAnalysis > 0) {
+                                  recommendations.push(
+                                    "Follow up on AI-generated clinical insights"
+                                  );
+                                }
+
+                                const pendingAnalysis = (
+                                  selectedPatient?.files || []
+                                ).filter(
+                                  (f) =>
+                                    f.processingStatus === "pending" ||
+                                    f.processingStatus === "processing"
+                                ).length;
+                                if (pendingAnalysis > 0) {
+                                  recommendations.push(
+                                    `Complete analysis for ${pendingAnalysis} pending document(s)`
+                                  );
+                                }
+
+                                recommendations.push(
+                                  "Schedule next appointment as appropriate"
+                                );
+                              } else {
+                                recommendations.push(
+                                  "Upload patient documentation for AI analysis"
+                                );
+                                recommendations.push(
+                                  "Complete initial patient assessment"
+                                );
+                                recommendations.push(
+                                  "Establish baseline care plan"
+                                );
+                              }
+
+                              return recommendations;
+                            })().map((rec, i) => (
                               <li key={i} className="flex items-start">
                                 <span
                                   className="mr-2 flex-shrink-0"
@@ -1315,7 +1749,13 @@ const OverviewView = ({
 
                     {/* Critical Findings */}
                     {(selectedPatient?.files || []).some(
-                      (f) => f.analysisResults?.severity === "critical"
+                      (file) =>
+                        file.clinicalInsights &&
+                        file.clinicalInsights.some(
+                          (insight) =>
+                            insight.priority === "critical" ||
+                            insight.priority === "high"
+                        )
                     ) && (
                       <div
                         className="p-4 rounded-lg"
@@ -1367,11 +1807,20 @@ const OverviewView = ({
                               }}
                             >
                               {(selectedPatient?.files || [])
-                                .filter(
-                                  (f) =>
-                                    f.analysisResults?.severity === "critical"
+                                .flatMap((file) =>
+                                  (file.clinicalInsights || [])
+                                    .filter(
+                                      (insight) =>
+                                        insight.priority === "critical" ||
+                                        insight.priority === "high"
+                                    )
+                                    .map((insight) => ({
+                                      ...insight,
+                                      fileName: file.originalname,
+                                    }))
                                 )
-                                .map((file, i) => (
+                                .slice(0, 5)
+                                .map((insight, i) => (
                                   <li key={i} className="flex items-start">
                                     <span
                                       className="mr-2"
@@ -1380,9 +1829,23 @@ const OverviewView = ({
                                       •
                                     </span>
                                     <span>
-                                      <strong>{file.originalname}</strong>:{" "}
-                                      {file.analysisResults?.criticalFindings ||
-                                        "Critical abnormality detected"}
+                                      <strong>{insight.fileName}</strong>:{" "}
+                                      {insight.message?.replace(
+                                        /\*\*(.*?)\*\*/g,
+                                        "$1"
+                                      ) || "Critical finding detected"}
+                                      {insight.evidence && (
+                                        <span
+                                          className="text-xs block mt-1"
+                                          style={{
+                                            color: isDarkMode
+                                              ? "#9aa0a6"
+                                              : "#5f6368",
+                                          }}
+                                        >
+                                          Evidence: {insight.evidence}
+                                        </span>
+                                      )}
                                     </span>
                                   </li>
                                 ))}
@@ -1635,7 +2098,488 @@ const OverviewView = ({
     );
   }
 
-  // Default Overview View
+  // System Overview View (when no patient is selected)
+  return (
+    <div
+      className="p-3 sm:p-6 overflow-y-auto min-h-screen overflow-x-hidden"
+      style={{ background: isDarkMode ? "#18212f" : "#f6fcf3" }}
+    >
+      <div className="max-w-full w-full px-2 sm:px-4 md:px-6 space-y-4 sm:space-y-6">
+        {/* System Header */}
+        <div
+          className="rounded-lg sm:rounded-xl p-3 sm:p-6 transition-all overflow-hidden"
+          style={{
+            background: isDarkMode
+              ? `linear-gradient(135deg, ${BRAND.dark}, #2d3748)`
+              : `linear-gradient(135deg, ${BRAND.white}, #f8f9fa)`,
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
+            border: `1px solid ${
+              isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+            }`,
+          }}
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.secondary})`,
+                }}
+              >
+                <svg
+                  className="w-6 h-6 sm:w-8 sm:h-8 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3
+                  className="text-lg sm:text-2xl font-bold truncate"
+                  style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+                >
+                  System Overview
+                </h3>
+                <p
+                  className="text-xs sm:text-sm"
+                  style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                >
+                  Real-time analytics and insights across all patients
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:gap-3">
+              <button
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center transition-all duration-300"
+                style={{
+                  background: BRAND.primary,
+                  color: BRAND.white,
+                }}
+                onClick={() => setIsAddPatientModalOpen(true)}
+              >
+                <svg
+                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add Patient
+              </button>
+              <button
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center transition-all duration-300"
+                style={{
+                  background: isDarkMode ? "#2d3748" : "#f1f3f4",
+                  color: isDarkMode ? BRAND.white : BRAND.dark,
+                }}
+                onClick={() => setIsUploadModalOpen(true)}
+              >
+                <svg
+                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                Upload Document
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic System Statistics */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <StatCard
+            title="Total Patients"
+            value={stats.totalPatients}
+            icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+            color="primary"
+          />
+          <StatCard
+            title="Total Documents"
+            value={stats.totalDocuments}
+            icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            color="secondary"
+          />
+          <StatCard
+            title="AI Insights Generated"
+            value={stats.totalInsights}
+            icon="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            color="accent"
+          />
+          <StatCard
+            title="Critical Findings"
+            value={stats.criticalFindings}
+            icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            color="danger"
+          />
+        </div>
+
+        {/* Analysis Status Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <StatCard
+            title="Completed Analysis"
+            value={stats.completedAnalysis}
+            icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            color="secondary"
+          />
+          <StatCard
+            title="Pending Analysis"
+            value={stats.pendingAnalysis}
+            icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            color="accent"
+          />
+          <StatCard
+            title="Recent Activity (7d)"
+            value={stats.recentActivity}
+            icon="M13 10V3L4 14h7v7l9-11h-7z"
+            color="primary"
+          />
+        </div>
+
+        {/* Dynamic Insights Dashboard */}
+        {dynamicInsights.length > 0 && (
+          <div
+            className="rounded-xl p-3 sm:p-6 transition-all duration-300"
+            style={{
+              background: isDarkMode ? BRAND.dark : BRAND.white,
+              border: `1px solid ${
+                isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+              }`,
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h4
+                className="text-base sm:text-lg font-semibold flex items-center"
+                style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                Critical & High Priority Insights
+              </h4>
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{
+                  background: isDarkMode ? "#2d3748" : "#f1f3f4",
+                  color: isDarkMode ? "#9aa0a6" : "#5f6368",
+                }}
+              >
+                {dynamicInsights.length} insights
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+              {dynamicInsights.map((insight, index) => (
+                <div
+                  key={`${insight.fileId}-${index}`}
+                  className="p-3 rounded-lg transition-all duration-200"
+                  style={{
+                    background: isDarkMode ? "#2d3748" : "#f8f9fa",
+                    border: `1px solid ${
+                      isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+                    }`,
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          insight.priority === "critical"
+                            ? "text-red-600"
+                            : insight.priority === "high"
+                            ? "text-orange-600"
+                            : "text-yellow-600"
+                        }`}
+                        style={{
+                          backgroundColor: isDarkMode
+                            ? insight.priority === "critical"
+                              ? "rgba(211,47,47,0.2)"
+                              : insight.priority === "high"
+                              ? "rgba(255,152,0,0.2)"
+                              : "rgba(255,193,7,0.2)"
+                            : insight.priority === "critical"
+                            ? "rgba(211,47,47,0.1)"
+                            : insight.priority === "high"
+                            ? "rgba(255,152,0,0.1)"
+                            : "rgba(255,193,7,0.1)",
+                        }}
+                      >
+                        {insight.priority}
+                      </span>
+                      <span
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          background: isDarkMode ? "#374151" : "#e5e7eb",
+                          color: isDarkMode ? "#9ca3af" : "#6b7280",
+                        }}
+                      >
+                        {insight.type}
+                      </span>
+                    </div>
+                  </div>
+                  <p
+                    className="text-sm mb-2"
+                    style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        insight.message?.replace(
+                          /\*\*(.*?)\*\*/g,
+                          "<strong>$1</strong>"
+                        ) || "No details available",
+                    }}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <p
+                      className="text-xs"
+                      style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                    >
+                      Patient: {insight.patientName || "Unknown"}
+                    </p>
+                    <p
+                      className="text-xs"
+                      style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                    >
+                      Document: {insight.fileName}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Activity Feed */}
+        {activityData.length > 0 && (
+          <div
+            className="rounded-xl p-3 sm:p-6 transition-all duration-300"
+            style={{
+              background: isDarkMode ? BRAND.dark : BRAND.white,
+              border: `1px solid ${
+                isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+              }`,
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h4
+                className="text-base sm:text-lg font-semibold flex items-center"
+                style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                </svg>
+                Recent Activity
+              </h4>
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{
+                  background: isDarkMode ? "#2d3748" : "#f1f3f4",
+                  color: isDarkMode ? "#9aa0a6" : "#5f6368",
+                }}
+              >
+                Last 10 activities
+              </span>
+            </div>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {activityData.map((activity, index) => (
+                <div
+                  key={activity.id}
+                  className="flex items-center gap-3 p-3 rounded-lg transition-all duration-200"
+                  style={{
+                    background: isDarkMode ? "#2d3748" : "#f8f9fa",
+                    border: `1px solid ${
+                      isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+                    }`,
+                  }}
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background:
+                        activity.type === "analysis_completed"
+                          ? `${BRAND.secondary}20`
+                          : `${BRAND.primary}20`,
+                    }}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke={
+                        activity.type === "analysis_completed"
+                          ? BRAND.secondary
+                          : BRAND.primary
+                      }
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d={
+                          activity.type === "analysis_completed"
+                            ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            : "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                        }
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm font-medium truncate"
+                      style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+                    >
+                      {activity.type === "analysis_completed"
+                        ? `Analysis completed for ${activity.fileName}`
+                        : `Document uploaded: ${activity.fileName}`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p
+                        className="text-xs"
+                        style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                      >
+                        Patient: {activity.patientName || "Unknown"}
+                      </p>
+                      {activity.insightCount > 0 && (
+                        <>
+                          <span className="text-xs">•</span>
+                          <p
+                            className="text-xs"
+                            style={{
+                              color: isDarkMode ? "#9aa0a6" : "#5f6368",
+                            }}
+                          >
+                            {activity.insightCount} insights generated
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+                    >
+                      {new Date(activity.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                  <DocumentStatus status={activity.status} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {stats.totalPatients === 0 && (
+          <div
+            className="rounded-xl p-8 text-center transition-all duration-300"
+            style={{
+              background: isDarkMode ? BRAND.dark : BRAND.white,
+              border: `1px solid ${
+                isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+              }`,
+            }}
+          >
+            <svg
+              className="w-16 h-16 mx-auto mb-4"
+              fill="none"
+              stroke={isDarkMode ? "#2d3748" : "#dadce0"}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+            <h3
+              className="text-lg font-semibold mb-2"
+              style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+            >
+              Welcome to Your Healthcare Analytics Dashboard
+            </h3>
+            <p
+              className="text-sm mb-4"
+              style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+            >
+              Start by adding your first patient and uploading their medical
+              documents to see AI-powered insights and analytics.
+            </p>
+            <button
+              className="px-6 py-3 rounded-lg font-medium inline-flex items-center transition-all duration-300"
+              style={{
+                background: BRAND.primary,
+                color: BRAND.white,
+              }}
+              onClick={() => setIsAddPatientModalOpen(true)}
+            >
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Add Your First Patient
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {isAddPatientModalOpen && (
+        <AddPatientModal
+          isOpen={isAddPatientModalOpen}
+          onClose={() => setIsAddPatientModalOpen(false)}
+        />
+      )}
+    </div>
+  );
   return (
     <>
       <div

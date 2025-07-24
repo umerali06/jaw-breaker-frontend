@@ -17,6 +17,78 @@ const PatientDataProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Detect environment
+  const isDevEnvironment = () => {
+    return import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
+  };
+
+  // Generate sample data for testing
+  const generateSampleData = () => {
+    // Sample patients
+    const samplePatients = [
+      {
+        _id: "1",
+        id: "1",
+        name: "John Doe",
+        age: 45,
+        gender: "Male",
+        condition: "stable",
+        phone: "555-1234",
+        files: [],
+      },
+      {
+        _id: "2",
+        id: "2",
+        name: "Jane Smith",
+        age: 38,
+        gender: "Female",
+        condition: "improving",
+        phone: "555-5678",
+        files: [],
+      },
+      {
+        _id: "3",
+        id: "3",
+        name: "Robert Johnson",
+        age: 62,
+        gender: "Male",
+        condition: "chronic",
+        phone: "555-9012",
+        files: [],
+      },
+    ];
+
+    // Sample files
+    const sampleFiles = [
+      {
+        _id: "file1",
+        originalname: "patient_record.pdf",
+        mimetype: "application/pdf",
+        createdAt: new Date().toISOString(),
+        processingStatus: "completed",
+        patientId: "1",
+      },
+      {
+        _id: "file2",
+        originalname: "medical_notes.docx",
+        mimetype: "application/docx",
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+        processingStatus: "completed",
+        patientId: "2",
+      },
+      {
+        _id: "file3",
+        originalname: "lab_results.pdf",
+        mimetype: "application/pdf",
+        createdAt: new Date(Date.now() - 172800000).toISOString(),
+        processingStatus: "processing",
+        patientId: "1",
+      },
+    ];
+
+    return { patients: samplePatients, files: sampleFiles };
+  };
+
   // Fetch all patient files
   const fetchFiles = async () => {
     try {
@@ -36,9 +108,6 @@ const PatientDataProvider = ({ children }) => {
       } else {
         throw new Error("Failed to fetch files");
       }
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setError("Failed to load patient data");
     } finally {
       setLoading(false);
     }
@@ -48,6 +117,7 @@ const PatientDataProvider = ({ children }) => {
   const uploadFile = async (file, options = {}) => {
     try {
       setLoading(true);
+      console.log("Uploading file with options:", options);
 
       const formData = new FormData();
       formData.append("file", file);
@@ -60,10 +130,11 @@ const PatientDataProvider = ({ children }) => {
         formData.append("patientId", options.id);
       }
 
-      // Add auto-analyze option
-      if (options.analyze !== undefined) {
-        formData.append("analyze", options.analyze.toString());
-      }
+      // Add auto-analyze option - explicitly set to true or false
+      const shouldAnalyze =
+        options.analyze === true || options.analyze === "true";
+      formData.append("analyze", shouldAnalyze.toString());
+      console.log("Auto-analyze set to:", shouldAnalyze);
 
       const token = localStorage.getItem("authToken");
       const response = await fetch(API_ENDPOINTS.UPLOAD, {
@@ -76,9 +147,19 @@ const PatientDataProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("File upload successful:", data.file);
+
         // Refresh files after upload
-        await fetchFiles(); // This will now only fetch files and trigger the useMemo recalculation
-        return { success: true, file: data.file };
+        await fetchFiles();
+
+        // Return the file with processing status for immediate UI feedback
+        return {
+          success: true,
+          file: {
+            ...data.file,
+            processingStatus: shouldAnalyze ? "processing" : "pending",
+          },
+        };
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || "Upload failed");
@@ -358,13 +439,35 @@ const PatientDataProvider = ({ children }) => {
 
   // Initialize data on mount
   useEffect(() => {
+    // Always try to fetch real data first
     fetchPatients();
     fetchFiles();
+
+    // If we're in development and want to ensure we have sample data
+    if (isDevEnvironment() && import.meta.env.VITE_USE_SAMPLE_DATA === "true") {
+      const sampleData = generateSampleData();
+      setPatientsFromApi(sampleData.patients);
+      setFiles(sampleData.files);
+      setLoading(false);
+    }
   }, []);
 
   const patients = useMemo(() => {
+    console.log("=== PATIENT DATA CONTEXT DEBUG ===");
+    console.log("PatientsFromApi:", patientsFromApi);
+    console.log("Files:", files);
+
     return patientsFromApi.map((p) => {
       const patientFiles = files.filter((f) => f.patientId === p.id);
+      console.log(`Patient ${p.name} (ID: ${p.id}):`, {
+        patientId: p.id,
+        matchingFiles: patientFiles.length,
+        filePatientIds: files.map((f) => ({
+          name: f.originalname,
+          patientId: f.patientId,
+        })),
+      });
+
       const lastUpdated =
         patientFiles.length > 0
           ? patientFiles.reduce((latest, file) =>

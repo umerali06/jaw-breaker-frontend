@@ -37,7 +37,6 @@ const EditPatientModal = ({ patient, onClose, onSuccess }) => {
     age: "",
     gender: "",
     phone: "",
-    email: "",
     condition: "stable",
     notes: "",
   });
@@ -52,7 +51,6 @@ const EditPatientModal = ({ patient, onClose, onSuccess }) => {
         age: patient.age || "",
         gender: patient.gender || "",
         phone: patient.phone || "",
-        email: patient.email || "",
         condition: patient.condition || "stable",
         notes: patient.notes || "",
       });
@@ -89,13 +87,6 @@ const EditPatientModal = ({ patient, onClose, onSuccess }) => {
     }
     if (!patientInfo.phone.trim()) {
       showToast("error", "Phone is required.");
-      return;
-    }
-    if (
-      !patientInfo.email.trim() ||
-      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(patientInfo.email)
-    ) {
-      showToast("error", "Valid email is required.");
       return;
     }
 
@@ -268,27 +259,7 @@ const EditPatientModal = ({ patient, onClose, onSuccess }) => {
                 />
               </div>
 
-              {/* Email */}
-              <div>
-                <label
-                  className="block text-sm font-bold mb-2"
-                  style={secondaryTextStyles}
-                >
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={patientInfo.email}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 font-bold"
-                  style={{
-                    ...inputStyles,
-                    focusRingColor: primaryBlue,
-                  }}
-                  placeholder="Enter email address"
-                />
-              </div>
+
 
               {/* Condition */}
               <div>

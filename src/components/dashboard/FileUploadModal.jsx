@@ -96,36 +96,67 @@ const FileUploadModal = ({ onClose, onUploadSuccess, selectedPatient }) => {
       showToast("error", "Please select a valid patient.");
       return;
     }
+
     const results = [];
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
       setUploadProgress((prev) => ({ ...prev, [i]: 0 }));
+
       try {
+        // Set progress to 10% to show upload started
+        setUploadProgress((prev) => ({ ...prev, [i]: 10 }));
+
+        // Prepare upload options with explicit auto-analyze setting
         const uploadOptions = {
           name: patient.name,
           id: patient.id,
-          analyze: autoAnalyze,
+          analyze: autoAnalyze === true, // Ensure it's a boolean
         };
+
+        console.log(
+          `Uploading file ${i + 1}/${selectedFiles.length} with auto-analyze:`,
+          autoAnalyze
+        );
+
+        // Upload the file
         const result = await uploadFile(file, uploadOptions);
         results.push(result);
+
+        // Set progress to 100% when complete
         setUploadProgress((prev) => ({ ...prev, [i]: 100 }));
+
+        // Show analysis status if auto-analyze is enabled
+        if (autoAnalyze && result.success) {
+          console.log(
+            `File ${i + 1} uploaded and analysis started:`,
+            result.file
+          );
+          showToast("info", `Analysis started for ${file.name}`);
+        }
       } catch (error) {
         console.error("Upload error:", error);
         results.push({ success: false, error: error.message });
+        setUploadProgress((prev) => ({ ...prev, [i]: 0 }));
       }
     }
+
+    // Handle results
     const allSuccessful = results.every((result) => result.success);
     if (allSuccessful) {
-      showToast("success", "All files uploaded successfully!");
+      const message = autoAnalyze
+        ? "All files uploaded successfully! Analysis in progress..."
+        : "All files uploaded successfully!";
+      showToast("success", message);
       onUploadSuccess();
     } else {
       const failedCount = results.filter((result) => !result.success).length;
       const successCount = results.filter((result) => result.success).length;
+
       if (successCount > 0) {
-        showToast(
-          "success",
-          `${successCount} file(s) uploaded successfully, but ${failedCount} file(s) failed. Please try again for the failed files.`
-        );
+        const message = autoAnalyze
+          ? `${successCount} file(s) uploaded and analysis started, but ${failedCount} file(s) failed.`
+          : `${successCount} file(s) uploaded successfully, but ${failedCount} file(s) failed.`;
+        showToast("success", message);
         onUploadSuccess();
       } else {
         showToast(

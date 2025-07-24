@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePatientData } from "../../../contexts/PatientDataContext";
 import { useTheme } from "../../../contexts/ThemeContext";
 import {
@@ -12,68 +12,133 @@ import {
   Pie,
   Cell,
   Legend,
+  CartesianGrid,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  RadialBarChart,
+  RadialBar,
+  ComposedChart,
+  ScatterChart,
+  Scatter,
+  Treemap,
 } from "recharts";
+
+// Enhanced Brand color definitions with medical theme - Updated Version
+const BRAND = {
+  primary: "#1a73e8", // Professional blue
+  primaryLight: "#e8f0fe",
+  primaryDark: "#0d47a1",
+  secondary: "#34a853", // Healthy green
+  secondaryLight: "#e6f4ea",
+  secondaryDark: "#0d652d",
+  accent: "#fbbc04", // Attention yellow
+  accentLight: "#fff8e1",
+  accentDark: "#e65100",
+  danger: "#d32f2f", // Alert red
+  dangerLight: "#ffebee",
+  dark: "#202124", // Dark background
+  light: "#f8f9fa", // Light background
+  neutral: "#5f6368", // Neutral gray
+  white: "#ffffff",
+  purple: "#9c27b0",
+  teal: "#009688",
+  orange: "#ff9800",
+  indigo: "#3f51b5",
+  pink: "#e91e63",
+  cyan: "#00bcd4",
+};
+
+const CHART_COLORS = [
+  BRAND.primary,
+  BRAND.secondary,
+  BRAND.accent,
+  BRAND.purple,
+  BRAND.teal,
+  BRAND.orange,
+  BRAND.indigo,
+  BRAND.pink,
+  BRAND.cyan,
+  BRAND.danger,
+];
 
 const AnalyticsView = () => {
   const { patients, files, loading } = usePatientData();
   const { isDarkMode } = useTheme();
-  const [timeRange, setTimeRange] = useState("30"); // days
+  const [timeRange, setTimeRange] = useState("30");
+  const [selectedView, setSelectedView] = useState("overview");
   const [isCalculating, setIsCalculating] = useState(false);
-  const [analytics, setAnalytics] = useState({
-    totalDocuments: 0,
-    processedDocuments: 0,
-    averageProcessingTime: 0,
-    documentTypes: {},
-    processingTrends: [],
-    patientActivity: [],
-    oasisScores: [],
-    clinicalInsights: [],
-  });
 
-  useEffect(() => {
-    if (!loading) {
-      setIsCalculating(true);
-      // Add a small delay to show loading state
-      const timer = setTimeout(() => {
-        calculateAnalytics();
-        setIsCalculating(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [files, patients, timeRange, loading]);
+  // Define getOASISDescription function before it's used in the useMemo hook
+  const getOASISDescription = (item) => {
+    const descriptions = {
+      M1830: "Bathing",
+      M1840: "Toilet Transferring",
+      M1850: "Transferring",
+      M1860: "Ambulation/Locomotion",
+      M1033: "Risk for Hospitalization",
+      M1311: "Current Number of Unhealed Pressure Ulcers",
+      M1322: "Current Number of Stage 2 Pressure Ulcers",
+      M1324: "Stage of Most Problematic Unhealed Pressure Ulcer",
+    };
+    return descriptions[item] || item;
+  };
 
-  const calculateAnalytics = () => {
+  // Dynamic analytics calculation
+  const analytics = useMemo(() => {
+    if (loading || !files || !patients) return null;
+
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - parseInt(timeRange));
 
-    const recentFiles = files.filter(
-      (file) => new Date(file.createdAt) > cutoffDate
+    const filesArray = Array.isArray(files) ? files : [];
+    const patientsArray = Array.isArray(patients) ? patients : [];
+    const recentFiles = filesArray.filter(
+      (file) => file && file.createdAt && new Date(file.createdAt) > cutoffDate
     );
 
-    // Basic stats
+    // Basic metrics
     const totalDocuments = recentFiles.length;
     const processedDocuments = recentFiles.filter(
       (f) => f.processingStatus === "completed"
     ).length;
+    const pendingDocuments = recentFiles.filter(
+      (f) =>
+        f.processingStatus === "pending" || f.processingStatus === "processing"
+    ).length;
+    const failedDocuments = recentFiles.filter(
+      (f) => f.processingStatus === "failed"
+    ).length;
+    const processingSuccess =
+      totalDocuments > 0
+        ? Math.round((processedDocuments / totalDocuments) * 100)
+        : 0;
 
-    // Document types
-    const documentTypes = {};
-    if (recentFiles.length > 0) {
-      recentFiles.forEach((file) => {
-        const type =
-          (file.mimetype || "application/unknown").split("/")[1] || "unknown";
-        documentTypes[type] = (documentTypes[type] || 0) + 1;
-      });
-    } else {
-      // Add sample data when no files exist
-      documentTypes.pdf = 5;
-      documentTypes.docx = 3;
-      documentTypes.txt = 2;
-    }
+    // Calculate all insights
+    const allInsights = [];
+    recentFiles.forEach((file) => {
+      if (file.clinicalInsights && Array.isArray(file.clinicalInsights)) {
+        file.clinicalInsights.forEach((insight) => {
+          allInsights.push({
+            ...insight,
+            fileName: file.originalname,
+            patientName: file.patientName,
+            createdAt: file.createdAt,
+            fileId: file._id,
+          });
+        });
+      }
+    });
 
-    // Processing trends (last 7 days)
+    const totalInsights = allInsights.length;
+    const criticalInsights = allInsights.filter(
+      (i) => i.priority === "critical" || i.priority === "high"
+    ).length;
+
+    // Processing trends for the last 14 days
     const processingTrends = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 13; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dayFiles = recentFiles.filter((file) => {
@@ -81,276 +146,437 @@ const AnalyticsView = () => {
         return fileDate.toDateString() === date.toDateString();
       });
 
-      // Add some sample data if no real data exists
-      const uploaded = dayFiles.length || Math.floor(Math.random() * 5);
-      const processed =
-        dayFiles.filter((f) => f.processingStatus === "completed").length ||
-        Math.floor(uploaded * 0.8);
+      const uploaded = dayFiles.length;
+      const processed = dayFiles.filter(
+        (f) => f.processingStatus === "completed"
+      ).length;
+      const insights = dayFiles.reduce(
+        (sum, file) =>
+          sum + (file.clinicalInsights ? file.clinicalInsights.length : 0),
+        0
+      );
 
       processingTrends.push({
         date: date.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
         }),
+        fullDate: date.toISOString().split("T")[0],
         uploaded,
         processed,
+        insights,
+        failed: dayFiles.filter((f) => f.processingStatus === "failed").length,
+        success: uploaded > 0 ? Math.round((processed / uploaded) * 100) : 0,
       });
     }
 
-    // Patient activity
-    let patientActivity = (patients || [])
-      .map((patient) => ({
-        name: patient.name,
-        documents: (patient.files || []).filter(
-          (f) => new Date(f.createdAt) > cutoffDate
-        ).length,
-        lastActivity: patient.lastUpdated,
-      }))
-      .sort((a, b) => b.documents - a.documents)
-      .slice(0, 5);
+    // Document types analysis
+    const documentTypesMap = {};
+    recentFiles.forEach((file) => {
+      const type =
+        (file.mimetype || "application/unknown").split("/")[1] || "unknown";
+      const displayType =
+        type === "pdf"
+          ? "PDF"
+          : type.includes("word")
+          ? "Word"
+          : type === "plain"
+          ? "Text"
+          : type.includes("image")
+          ? "Image"
+          : type.toUpperCase();
+      documentTypesMap[displayType] = (documentTypesMap[displayType] || 0) + 1;
+    });
 
-    // Add sample data if no patients exist
-    if (patientActivity.length === 0) {
-      patientActivity = [
-        {
-          name: "John Smith",
-          documents: 8,
-          lastActivity: new Date().toISOString(),
-        },
-        {
-          name: "Mary Johnson",
-          documents: 6,
-          lastActivity: new Date(Date.now() - 86400000).toISOString(),
-        },
-        {
-          name: "Robert Brown",
-          documents: 4,
-          lastActivity: new Date(Date.now() - 172800000).toISOString(),
-        },
-        {
-          name: "Sarah Davis",
-          documents: 3,
-          lastActivity: new Date(Date.now() - 259200000).toISOString(),
-        },
-        {
-          name: "Michael Wilson",
-          documents: 2,
-          lastActivity: new Date(Date.now() - 345600000).toISOString(),
-        },
-      ];
+    const documentTypes = Object.entries(documentTypesMap).map(
+      ([name, value], index) => ({
+        name,
+        value,
+        percentage: Math.round((value / totalDocuments) * 100) || 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+      })
+    );
+
+    // Insights by type and priority
+    const insightsByTypeMap = {};
+    const insightsByPriorityMap = {};
+
+    allInsights.forEach((insight) => {
+      const type = insight.type || "general";
+      const priority = insight.priority || "medium";
+
+      insightsByTypeMap[type] = (insightsByTypeMap[type] || 0) + 1;
+      insightsByPriorityMap[priority] =
+        (insightsByPriorityMap[priority] || 0) + 1;
+    });
+
+    const insightsByType = Object.entries(insightsByTypeMap).map(
+      ([name, value], index) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: Math.round((value / totalInsights) * 100) || 0,
+        fill: CHART_COLORS[index % CHART_COLORS.length],
+      })
+    );
+
+    const insightsByPriority = Object.entries(insightsByPriorityMap).map(
+      ([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value,
+        percentage: Math.round((value / totalInsights) * 100) || 0,
+        fill:
+          name === "critical"
+            ? BRAND.danger
+            : name === "high"
+            ? BRAND.orange
+            : name === "medium"
+            ? BRAND.accent
+            : BRAND.primary,
+      })
+    );
+
+    // Patient activity analysis
+    const patientActivity = patientsArray
+      .map((patient) => {
+        const patientFiles = (
+          Array.isArray(patient.files) ? patient.files : []
+        ).filter((f) => f && f.createdAt && new Date(f.createdAt) > cutoffDate);
+
+        const totalInsights = patientFiles.reduce(
+          (sum, file) =>
+            sum + (file.clinicalInsights ? file.clinicalInsights.length : 0),
+          0
+        );
+
+        const criticalFindings = patientFiles.reduce(
+          (sum, file) =>
+            sum +
+            (file.clinicalInsights
+              ? file.clinicalInsights.filter(
+                  (i) => i.priority === "critical" || i.priority === "high"
+                ).length
+              : 0),
+          0
+        );
+
+        const riskScore =
+          criticalFindings > 5
+            ? 85
+            : criticalFindings > 2
+            ? 65
+            : criticalFindings > 0
+            ? 45
+            : 25;
+
+        return {
+          name:
+            patient.name.length > 12
+              ? patient.name.substring(0, 12) + "..."
+              : patient.name,
+          fullName: patient.name,
+          documents: patientFiles.length,
+          insights: totalInsights,
+          criticalFindings,
+          riskScore,
+          lastActivity: patient.lastUpdated || new Date().toISOString(),
+          processed: patientFiles.filter(
+            (f) => f.processingStatus === "completed"
+          ).length,
+        };
+      })
+      .filter((p) => p.documents > 0)
+      .sort((a, b) => b.insights - a.insights)
+      .slice(0, 10);
+
+    // OASIS scores analysis
+    const oasisScores = [];
+    const oasisData = {};
+
+    recentFiles.forEach((file) => {
+      if (file.oasisScores && typeof file.oasisScores === "object") {
+        Object.entries(file.oasisScores).forEach(([item, score]) => {
+          if (!oasisData[item]) {
+            oasisData[item] = [];
+          }
+          if (typeof score === "object" && score.score !== undefined) {
+            oasisData[item].push(parseFloat(score.score) || 0);
+          } else if (typeof score === "number") {
+            oasisData[item].push(score);
+          }
+        });
+      }
+    });
+
+    Object.entries(oasisData).forEach(([item, scores]) => {
+      if (scores.length > 0) {
+        const average =
+          scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        const description = getOASISDescription(item);
+        oasisScores.push({
+          item,
+          description,
+          averageScore: Math.round(average * 10) / 10,
+          count: scores.length,
+          maxScore: Math.max(...scores),
+          minScore: Math.min(...scores),
+          fill:
+            average > 3
+              ? BRAND.danger
+              : average > 2
+              ? BRAND.accent
+              : BRAND.secondary,
+        });
+      }
+    });
+
+    // Processing performance metrics
+    const completedFiles = recentFiles.filter(
+      (f) =>
+        f.processingStatus === "completed" &&
+        f.processingStarted &&
+        f.processingCompleted
+    );
+
+    let averageProcessingTime = 0;
+    if (completedFiles.length > 0) {
+      const totalTime = completedFiles.reduce((sum, file) => {
+        const start = new Date(file.processingStarted);
+        const end = new Date(file.processingCompleted);
+        return sum + (end - start);
+      }, 0);
+      averageProcessingTime =
+        Math.round((totalTime / completedFiles.length / 1000 / 60) * 10) / 10;
     }
 
-    // Mock OASIS scores and clinical insights
-    const oasisScores = [
-      {
-        item: "M1830",
-        description: "Bathing",
-        averageScore: 2.3,
-        trend: "stable",
-      },
-      {
-        item: "M1840",
-        description: "Toilet Transferring",
-        averageScore: 1.8,
-        trend: "improving",
-      },
-      {
-        item: "M1850",
-        description: "Transferring",
-        averageScore: 2.1,
-        trend: "declining",
-      },
-      {
-        item: "M1860",
-        description: "Ambulation",
-        averageScore: 2.5,
-        trend: "stable",
-      },
-    ];
+    // Recent insights for timeline
+    const recentInsights = allInsights
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 10);
 
-    const clinicalInsights = [
-      {
-        type: "risk",
-        message: "Increased fall risk identified in 3 patients",
-        priority: "high",
-      },
-      {
-        type: "improvement",
-        message: "Overall mobility scores improving",
-        priority: "medium",
-      },
-      {
-        type: "alert",
-        message: "2 patients require medication review",
-        priority: "high",
-      },
-      {
-        type: "trend",
-        message: "Documentation completeness at 95%",
-        priority: "low",
-      },
-    ];
+    // Processing status distribution
+    const processingStatus = [
+      { name: "Completed", value: processedDocuments, fill: BRAND.secondary },
+      { name: "Pending", value: pendingDocuments, fill: BRAND.accent },
+      { name: "Failed", value: failedDocuments, fill: BRAND.danger },
+    ].filter((item) => item.value > 0);
 
-    setAnalytics({
+    return {
       totalDocuments,
       processedDocuments,
-      averageProcessingTime: 2.3, // Mock value
-      documentTypes,
+      pendingDocuments,
+      failedDocuments,
+      processingSuccess,
+      totalInsights,
+      criticalInsights,
+      averageProcessingTime,
       processingTrends,
+      documentTypes,
+      insightsByType,
+      insightsByPriority,
       patientActivity,
       oasisScores,
-      clinicalInsights,
-    });
-  };
+      recentInsights,
+      processingStatus,
+    };
+  }, [files, patients, timeRange, loading]);
 
-  const StatCard = ({
+
+  // Premium Metric Card Component
+  const MetricCard = ({
     title,
     value,
     subtitle,
     icon,
-    color = "blue",
+    color = "primary",
     trend,
-  }) => (
-    <div
-      className={`${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      } rounded-lg border p-3 sm:p-6 h-full`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p
-            className={`text-[10px] sm:text-xs md:text-sm font-medium truncate ${
-              isDarkMode ? "text-gray-300" : "text-gray-600"
-            }`}
-          >
-            {title}
-          </p>
-          <p
-            className={`text-lg sm:text-xl md:text-3xl font-bold truncate ${
-              isDarkMode ? "text-white" : "text-gray-900"
-            }`}
-          >
-            {value}
-          </p>
-          {subtitle && (
+    onClick,
+    isSelected,
+    className = "",
+  }) => {
+    const colors = {
+      primary: { bg: BRAND.primary, light: BRAND.primaryLight },
+      secondary: { bg: BRAND.secondary, light: BRAND.secondaryLight },
+      accent: { bg: BRAND.accent, light: BRAND.accentLight },
+      danger: { bg: BRAND.danger, light: BRAND.dangerLight },
+      purple: { bg: BRAND.purple, light: "#f3e5f5" },
+      teal: { bg: BRAND.teal, light: "#e0f2f1" },
+    };
+
+    const currentColors = colors[color] || colors.primary;
+
+    return (
+      <div
+        className={`p-4 sm:p-6 rounded-xl transition-all duration-300 cursor-pointer transform hover:scale-105 hover:shadow-lg ${
+          isSelected ? "ring-2 ring-offset-2 shadow-lg" : ""
+        } ${className}`}
+        style={{
+          background: isDarkMode
+            ? `linear-gradient(135deg, ${BRAND.dark}, #2d3748)`
+            : `linear-gradient(135deg, ${BRAND.white}, #f8f9fa)`,
+          boxShadow: isSelected
+            ? `0 8px 25px rgba(${
+                color === "primary" ? "26, 115, 232" : "52, 168, 83"
+              }, 0.3)`
+            : "0 4px 6px rgba(0, 0, 0, 0.1)",
+          border: `1px solid ${
+            isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+          }`,
+          ringColor: currentColors.bg,
+        }}
+        onClick={onClick}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
             <p
-              className={`text-[10px] sm:text-xs ${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              } mt-0.5 truncate`}
+              className="text-sm font-medium mb-1"
+              style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
             >
-              {subtitle}
+              {title}
             </p>
-          )}
-        </div>
-        <div
-          className={`p-1.5 sm:p-2 md:p-3 rounded-lg flex-shrink-0`}
-          style={{
-            backgroundColor: isDarkMode
-              ? `rgba(${
-                  color === "blue"
-                    ? "37, 99, 235"
-                    : color === "green"
-                    ? "52, 168, 83"
-                    : color === "yellow"
-                    ? "251, 188, 4"
-                    : "211, 47, 47"
-                }, 0.2)`
-              : `rgba(${
-                  color === "blue"
-                    ? "37, 99, 235"
-                    : color === "green"
-                    ? "52, 168, 83"
-                    : color === "yellow"
-                    ? "251, 188, 4"
-                    : "211, 47, 47"
-                }, 0.1)`,
-          }}
-        >
-          <svg
-            className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-6 md:h-6`}
-            fill="none"
-            stroke={
-              color === "blue"
-                ? "#2563eb"
-                : color === "green"
-                ? "#34a853"
-                : color === "yellow"
-                ? "#fbbc04"
-                : "#d32f2f"
-            }
-            viewBox="0 0 24 24"
+            <p
+              className="text-2xl sm:text-3xl font-bold mb-1"
+              style={{ color: isDarkMode ? BRAND.white : currentColors.bg }}
+            >
+              {value}
+            </p>
+            {subtitle && (
+              <p
+                className="text-xs"
+                style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+              >
+                {subtitle}
+              </p>
+            )}
+            {trend && (
+              <div className="flex items-center mt-2">
+                <span
+                  className={`text-xs font-medium flex items-center ${
+                    trend.direction === "up"
+                      ? "text-green-600"
+                      : trend.direction === "down"
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}
+                >
+                  {trend.direction === "up"
+                    ? "↗"
+                    : trend.direction === "down"
+                    ? "↘"
+                    : "→"}{" "}
+                  {trend.value}
+                </span>
+                <span className="text-xs text-gray-500 ml-1">
+                  vs last period
+                </span>
+              </div>
+            )}
+          </div>
+          <div
+            className="p-3 rounded-lg"
+            style={{
+              backgroundColor: isDarkMode
+                ? `${currentColors.bg}20`
+                : currentColors.light,
+            }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={icon}
-            />
-          </svg>
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke={currentColors.bg}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={icon}
+              />
+            </svg>
+          </div>
         </div>
       </div>
-      {trend && (
-        <div className="mt-1 sm:mt-2 md:mt-4 flex items-center">
-          <span
-            className={`text-[10px] sm:text-xs font-medium ${
-              trend.direction === "up"
-                ? "text-green-600"
-                : trend.direction === "down"
-                ? "text-red-600"
-                : isDarkMode
-                ? "text-gray-400"
-                : "text-gray-600"
-            }`}
-          >
-            {trend.direction === "up"
-              ? "↗"
-              : trend.direction === "down"
-              ? "↘"
-              : "→"}{" "}
-            {trend.value}
-          </span>
-          <span
-            className={`text-[10px] sm:text-xs ${
-              isDarkMode ? "text-gray-400" : "text-gray-500"
-            } ml-1 truncate`}
-          >
-            vs last period
-          </span>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
-  const ChartCard = ({ title, children }) => (
+  // Premium Chart Card Component
+  const ChartCard = ({ title, children, className = "", actions }) => (
     <div
-      className={`${
-        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      } rounded-lg border p-3 sm:p-6 h-full flex flex-col`}
+      className={`rounded-xl p-4 sm:p-6 transition-all duration-300 hover:shadow-lg ${className}`}
+      style={{
+        background: isDarkMode ? BRAND.dark : BRAND.white,
+        border: `1px solid ${
+          isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+        }`,
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+      }}
     >
-      <h3
-        className={`text-sm sm:text-base md:text-lg font-semibold ${
-          isDarkMode ? "text-white" : "text-gray-900"
-        } mb-2 sm:mb-4 truncate`}
-      >
-        {title}
-      </h3>
-      <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+      <div className="flex items-center justify-between mb-4">
+        <h3
+          className="text-lg font-semibold"
+          style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+        >
+          {title}
+        </h3>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
+      </div>
+      {children}
     </div>
   );
 
-  if (loading || isCalculating) {
+  // Custom Tooltip Component
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div
+          className="p-3 rounded-lg shadow-lg border"
+          style={{
+            backgroundColor: isDarkMode ? "#374151" : "#ffffff",
+            borderColor: isDarkMode ? "#4b5563" : "#e5e7eb",
+            color: isDarkMode ? "#ffffff" : "#000000",
+          }}
+        >
+          <p className="font-medium mb-1">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color }} className="text-sm">
+              {entry.name}: {entry.value}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (loading || !analytics) {
     return (
-      <div className="p-3 sm:p-6 overflow-y-auto">
+      <div
+        className="p-6 overflow-y-auto min-h-screen"
+        style={{ background: isDarkMode ? "#18212f" : "#f6fcf3" }}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2596be]"></div>
+              <div className="relative">
+                <div
+                  className="animate-spin rounded-full h-12 w-12 border-b-2 border-t-2"
+                  style={{ borderColor: BRAND.primary }}
+                ></div>
+                <div
+                  className="absolute inset-0 animate-ping rounded-full h-12 w-12 border-2 opacity-20"
+                  style={{ borderColor: BRAND.primary }}
+                ></div>
+              </div>
               <p
-                className={`text-sm ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
+                className="text-lg font-medium"
+                style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
               >
-                Loading analytics data...
+                Analyzing Clinical Data...
+              </p>
+              <p
+                className="text-sm"
+                style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+              >
+                Processing insights and generating analytics
               </p>
             </div>
           </div>
@@ -360,489 +586,471 @@ const AnalyticsView = () => {
   }
 
   return (
-    <div className="p-3 sm:p-6 overflow-y-auto">
-      <div className="max-w-7xl mx-auto">
+    <div
+      className="p-4 sm:p-6 overflow-y-auto min-h-screen"
+      style={{ background: isDarkMode ? "#18212f" : "#f6fcf3" }}
+    >
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-          <div>
-            <h2
-              className={`text-lg sm:text-xl md:text-2xl font-bold ${
-                isDarkMode ? "text-white" : "text-gray-900"
-              }`}
-            >
-              Analytics Dashboard
-            </h2>
-            <p
-              className={`text-xs sm:text-sm ${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              }`}
-            >
-              Clinical insights and performance metrics
-            </p>
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: isDarkMode
+              ? `linear-gradient(135deg, ${BRAND.dark}, #2d3748)`
+              : `linear-gradient(135deg, ${BRAND.white}, #f8f9fa)`,
+            border: `1px solid ${
+              isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"
+            }`,
+          }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1
+                className="text-2xl sm:text-3xl font-bold mb-2"
+                style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+              >
+                Clinical Analytics Dashboard
+              </h1>
+              <p
+                className="text-sm sm:text-base"
+                style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
+              >
+                AI-powered insights and performance metrics for healthcare
+                analytics
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className="px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  backgroundColor: isDarkMode ? "#374151" : BRAND.white,
+                  borderColor: isDarkMode ? "#4b5563" : "#d1d5db",
+                  color: isDarkMode ? BRAND.white : BRAND.dark,
+                  focusRingColor: BRAND.primary,
+                }}
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last year</option>
+              </select>
+            </div>
           </div>
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2596be] ${
-              isDarkMode
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="365">Last year</option>
-          </select>
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
-          <StatCard
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <MetricCard
             title="Total Documents"
             value={analytics.totalDocuments}
-            subtitle="Uploaded in period"
+            subtitle={`${analytics.processedDocuments} processed successfully`}
             icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            color="blue"
-            trend={{ direction: "up", value: "+12%" }}
+            color="primary"
+            onClick={() => setSelectedView("documents")}
+            isSelected={selectedView === "documents"}
           />
-          <StatCard
-            title="Processed"
-            value={analytics.processedDocuments}
-            subtitle={`${
-              Math.round(
-                (analytics.processedDocuments / analytics.totalDocuments) * 100
-              ) || 0
-            }% completion rate`}
+          <MetricCard
+            title="AI Insights Generated"
+            value={analytics.totalInsights}
+            subtitle={`${analytics.criticalInsights} critical findings`}
+            icon="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            color="secondary"
+            onClick={() => setSelectedView("insights")}
+            isSelected={selectedView === "insights"}
+          />
+          <MetricCard
+            title="Processing Success"
+            value={`${analytics.processingSuccess}%`}
+            subtitle={`${analytics.averageProcessingTime}min avg time`}
             icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            color="green"
-            trend={{ direction: "up", value: "+8%" }}
+            color="accent"
+            onClick={() => setSelectedView("performance")}
+            isSelected={selectedView === "performance"}
           />
-          <StatCard
-            title="Active Patients"
-            value={patients.length}
-            subtitle="With recent activity"
-            icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-            color="purple"
-            trend={{ direction: "stable", value: "0%" }}
-          />
-          <StatCard
-            title="Avg Processing"
-            value={`${analytics.averageProcessingTime}min`}
-            subtitle="Per document"
-            icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            color="yellow"
-            trend={{ direction: "down", value: "-15%" }}
+          <MetricCard
+            title="Critical Findings"
+            value={analytics.criticalInsights}
+            subtitle={`${Math.round(
+              (analytics.criticalInsights /
+                Math.max(analytics.totalInsights, 1)) *
+                100
+            )}% of total insights`}
+            icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            color="danger"
+            onClick={() => setSelectedView("critical")}
+            isSelected={selectedView === "critical"}
           />
         </div>
 
-        {/* Charts and Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
+        {/* Main Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Processing Trends */}
-          <ChartCard title="Document Processing Trends">
-            <div className="w-full h-40 sm:h-48 md:h-72 flex-1">
-              {analytics.processingTrends &&
-              analytics.processingTrends.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={analytics.processingTrends}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="uploadedGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop offset="0%" stopColor="#2596be" />
-                        <stop offset="100%" stopColor="#1e7a96" />
-                      </linearGradient>
-                      <linearGradient
-                        id="processedGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop offset="0%" stopColor="#10b981" />
-                        <stop offset="100%" stopColor="#059669" />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="date"
-                      stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: isDarkMode ? "#374151" : "#ffffff",
-                        border: "none",
-                        borderRadius: "8px",
-                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                        color: isDarkMode ? "#ffffff" : "#000000",
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="uploaded"
-                      name="Uploaded"
-                      fill="url(#uploadedGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="processed"
-                      name="Processed"
-                      fill="url(#processedGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p
-                    className={`text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
-                  >
-                    No data available for the selected period
-                  </p>
-                </div>
-              )}
+          <ChartCard
+            title="Processing Trends (14 Days)"
+            className="lg:col-span-2"
+          >
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={analytics.processingTrends}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={isDarkMode ? "#374151" : "#e5e7eb"}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <YAxis
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Bar
+                    dataKey="uploaded"
+                    name="Uploaded"
+                    fill={BRAND.primary}
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="processed"
+                    name="Processed"
+                    fill={BRAND.secondary}
+                    radius={[2, 2, 0, 0]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="insights"
+                    name="Insights"
+                    stroke={BRAND.accent}
+                    strokeWidth={3}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
           </ChartCard>
 
           {/* Document Types */}
           <ChartCard title="Document Types Distribution">
-            <div className="w-full h-40 sm:h-48 md:h-72 flex items-center justify-center flex-1">
-              {Object.keys(analytics.documentTypes).length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={Object.entries(analytics.documentTypes).map(
-                        ([type, count]) => ({
-                          name: type.toUpperCase(),
-                          value: count,
-                          displayName:
-                            type === "pdf"
-                              ? "PDF"
-                              : type === "docx"
-                              ? "Word"
-                              : type === "txt"
-                              ? "Text"
-                              : type.toUpperCase(),
-                        })
-                      )}
-                      dataKey="value"
-                      nameKey="displayName"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      innerRadius={40}
-                      paddingAngle={5}
-                      label={({ displayName, percent }) =>
-                        `${displayName} ${(percent * 100).toFixed(1)}%`
-                      }
-                      labelLine={false}
-                    >
-                      {Object.entries(analytics.documentTypes).map(
-                        (entry, idx) => {
-                          const colors = [
-                            "#2596be",
-                            "#10b981",
-                            "#f59e0b",
-                            "#ef4444",
-                            "#8b5cf6",
-                            "#06b6d4",
-                          ];
-                          return (
-                            <Cell
-                              key={`cell-${idx}`}
-                              fill={colors[idx % colors.length]}
-                            />
-                          );
-                        }
-                      )}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: isDarkMode ? "#374151" : "#ffffff",
-                        border: "none",
-                        borderRadius: "8px",
-                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                        color: isDarkMode ? "#ffffff" : "#000000",
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p
-                    className={`text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analytics.documentTypes}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={40}
+                    paddingAngle={2}
                   >
-                    No document types data available
-                  </p>
-                </div>
-              )}
+                    {analytics.documentTypes.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          {/* Processing Status */}
+          <ChartCard title="Processing Status">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="20%"
+                  outerRadius="90%"
+                  data={analytics.processingStatus}
+                >
+                  <RadialBar dataKey="value" cornerRadius={10} fill="#8884d8" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </RadialBarChart>
+              </ResponsiveContainer>
             </div>
           </ChartCard>
         </div>
 
-        {/* OASIS Scores and Clinical Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">
-          {/* OASIS Scores */}
-          <ChartCard title="OASIS Score Trends">
-            <div className="space-y-2 sm:space-y-3 md:space-y-4 overflow-y-auto flex-1">
-              {analytics.oasisScores.map((score, index) => (
+        {/* Insights Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Insights by Type */}
+          <ChartCard title="Clinical Insights by Type">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analytics.insightsByType} layout="horizontal">
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={isDarkMode ? "#374151" : "#e5e7eb"}
+                  />
+                  <XAxis
+                    type="number"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {analytics.insightsByType.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+
+          {/* Insights by Priority */}
+          <ChartCard title="Insights by Priority Level">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analytics.insightsByPriority}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    paddingAngle={5}
+                  >
+                    {analytics.insightsByPriority.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        </div>
+
+        {/* Patient Activity Analysis */}
+        {analytics.patientActivity.length > 0 && (
+          <ChartCard
+            title="Patient Activity & Risk Analysis"
+            className="lg:col-span-2"
+          >
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart data={analytics.patientActivity}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={isDarkMode ? "#374151" : "#e5e7eb"}
+                  />
+                  <XAxis
+                    dataKey="documents"
+                    name="Documents"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <YAxis
+                    dataKey="insights"
+                    name="Insights"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <Tooltip
+                    cursor={{ strokeDasharray: "3 3" }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div
+                            className="p-3 rounded-lg shadow-lg border"
+                            style={{
+                              backgroundColor: isDarkMode
+                                ? "#374151"
+                                : "#ffffff",
+                              borderColor: isDarkMode ? "#4b5563" : "#e5e7eb",
+                              color: isDarkMode ? "#ffffff" : "#000000",
+                            }}
+                          >
+                            <p className="font-medium">{data.fullName}</p>
+                            <p className="text-sm">
+                              Documents: {data.documents}
+                            </p>
+                            <p className="text-sm">Insights: {data.insights}</p>
+                            <p className="text-sm">
+                              Critical: {data.criticalFindings}
+                            </p>
+                            <p className="text-sm">
+                              Risk Score: {data.riskScore}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Scatter dataKey="riskScore" fill={BRAND.primary} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        )}
+
+        {/* OASIS Scores */}
+        {analytics.oasisScores.length > 0 && (
+          <ChartCard title="OASIS Assessment Scores">
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analytics.oasisScores}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={isDarkMode ? "#374151" : "#e5e7eb"}
+                  />
+                  <XAxis
+                    dataKey="item"
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis
+                    stroke={isDarkMode ? "#9ca3af" : "#6b7280"}
+                    fontSize={12}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div
+                            className="p-3 rounded-lg shadow-lg border"
+                            style={{
+                              backgroundColor: isDarkMode
+                                ? "#374151"
+                                : "#ffffff",
+                              borderColor: isDarkMode ? "#4b5563" : "#e5e7eb",
+                              color: isDarkMode ? "#ffffff" : "#000000",
+                            }}
+                          >
+                            <p className="font-medium">{data.description}</p>
+                            <p className="text-sm">
+                              Average: {data.averageScore}
+                            </p>
+                            <p className="text-sm">Count: {data.count}</p>
+                            <p className="text-sm">
+                              Range: {data.minScore} - {data.maxScore}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="averageScore" radius={[4, 4, 0, 0]}>
+                    {analytics.oasisScores.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
+        )}
+
+        {/* Recent Insights Timeline */}
+        {analytics.recentInsights.length > 0 && (
+          <ChartCard title="Recent Clinical Insights">
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {analytics.recentInsights.map((insight, index) => (
                 <div
                   key={index}
-                  className={`border ${
-                    isDarkMode ? "border-gray-600" : "border-gray-200"
-                  } rounded-lg p-2 sm:p-3 md:p-4`}
+                  className="p-4 rounded-lg border-l-4 transition-all duration-200 hover:shadow-md"
+                  style={{
+                    backgroundColor: isDarkMode ? "#374151" : "#f8f9fa",
+                    borderLeftColor:
+                      insight.priority === "critical"
+                        ? BRAND.danger
+                        : insight.priority === "high"
+                        ? BRAND.orange
+                        : insight.priority === "medium"
+                        ? BRAND.accent
+                        : BRAND.primary,
+                  }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <h4
-                        className={`font-medium text-sm sm:text-base truncate ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {score.item}
-                      </h4>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className="text-xs px-2 py-1 rounded-full font-medium"
+                          style={{
+                            backgroundColor:
+                              insight.priority === "critical"
+                                ? `${BRAND.danger}20`
+                                : insight.priority === "high"
+                                ? `${BRAND.orange}20`
+                                : insight.priority === "medium"
+                                ? `${BRAND.accent}20`
+                                : `${BRAND.primary}20`,
+                            color:
+                              insight.priority === "critical"
+                                ? BRAND.danger
+                                : insight.priority === "high"
+                                ? BRAND.orange
+                                : insight.priority === "medium"
+                                ? BRAND.accent
+                                : BRAND.primary,
+                          }}
+                        >
+                          {insight.priority}
+                        </span>
+                        <span
+                          className="text-xs px-2 py-1 rounded-full"
+                          style={{
+                            backgroundColor: isDarkMode ? "#4b5563" : "#e5e7eb",
+                            color: isDarkMode ? "#9ca3af" : "#6b7280",
+                          }}
+                        >
+                          {insight.type}
+                        </span>
+                      </div>
                       <p
-                        className={`text-xs sm:text-sm truncate ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
+                        className="text-sm mb-2"
+                        style={{ color: isDarkMode ? BRAND.white : BRAND.dark }}
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            insight.message?.replace(
+                              /\*\*(.*?)\*\*/g,
+                              "<strong>$1</strong>"
+                            ) || "No details available",
+                        }}
+                      />
+                      <div
+                        className="flex items-center gap-4 text-xs"
+                        style={{ color: isDarkMode ? "#9aa0a6" : "#5f6368" }}
                       >
-                        {score.description}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p
-                        className={`text-base sm:text-lg font-bold ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {score.averageScore}
-                      </p>
-                      <span
-                        className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full inline-block ${
-                          score.trend === "improving"
-                            ? isDarkMode
-                              ? "bg-green-900 bg-opacity-30 text-green-300"
-                              : "bg-green-100 text-green-800"
-                            : score.trend === "declining"
-                            ? isDarkMode
-                              ? "bg-red-900 bg-opacity-30 text-red-300"
-                              : "bg-red-100 text-red-800"
-                            : isDarkMode
-                            ? "bg-gray-700 text-gray-300"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {score.trend}
-                      </span>
+                        <span>Patient: {insight.patientName || "Unknown"}</span>
+                        <span>•</span>
+                        <span>Document: {insight.fileName}</span>
+                        <span>•</span>
+                        <span>
+                          {new Date(insight.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </ChartCard>
-
-          {/* Clinical Insights */}
-          <ChartCard title="Clinical Insights">
-            <div className="space-y-2 sm:space-y-3 overflow-y-auto flex-1">
-              {analytics.clinicalInsights.map((insight, index) => (
-                <div
-                  key={index}
-                  className={`p-2 sm:p-3 md:p-4 rounded-lg border-l-4 ${
-                    insight.priority === "high"
-                      ? isDarkMode
-                        ? "bg-red-900 bg-opacity-20 border-red-500"
-                        : "bg-red-50 border-red-400"
-                      : insight.priority === "medium"
-                      ? isDarkMode
-                        ? "bg-yellow-900 bg-opacity-20 border-yellow-500"
-                        : "bg-yellow-50 border-yellow-400"
-                      : isDarkMode
-                      ? "bg-blue-900 bg-opacity-20 border-blue-500"
-                      : "bg-blue-50 border-blue-400"
-                  }`}
-                >
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <div
-                      className={`p-1 rounded-full flex-shrink-0 ${
-                        insight.type === "risk"
-                          ? isDarkMode
-                            ? "bg-red-900 bg-opacity-50"
-                            : "bg-red-100"
-                          : insight.type === "improvement"
-                          ? isDarkMode
-                            ? "bg-green-900 bg-opacity-50"
-                            : "bg-green-100"
-                          : insight.type === "alert"
-                          ? isDarkMode
-                            ? "bg-yellow-900 bg-opacity-50"
-                            : "bg-yellow-100"
-                          : isDarkMode
-                          ? "bg-blue-900 bg-opacity-50"
-                          : "bg-blue-100"
-                      }`}
-                    >
-                      <svg
-                        className={`w-3 h-3 sm:w-4 sm:h-4 ${
-                          insight.type === "risk"
-                            ? isDarkMode
-                              ? "text-red-400"
-                              : "text-red-600"
-                            : insight.type === "improvement"
-                            ? isDarkMode
-                              ? "text-green-400"
-                              : "text-green-600"
-                            : insight.type === "alert"
-                            ? isDarkMode
-                              ? "text-yellow-400"
-                              : "text-yellow-600"
-                            : isDarkMode
-                            ? "text-blue-400"
-                            : "text-blue-600"
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={
-                            insight.type === "risk"
-                              ? "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-                              : insight.type === "improvement"
-                              ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                              : insight.type === "alert"
-                              ? "M15 17h5l-5 5v-5zM4 19h6v-6H4v6zM16 3h5v5h-5V3zM4 3h6v6H4V3z"
-                              : "M13 10V3L4 14h7v7l9-11h-7z"
-                          }
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-xs sm:text-sm font-medium break-words ${
-                          insight.priority === "high"
-                            ? isDarkMode
-                              ? "text-red-300"
-                              : "text-red-800"
-                            : insight.priority === "medium"
-                            ? isDarkMode
-                              ? "text-yellow-300"
-                              : "text-yellow-800"
-                            : isDarkMode
-                            ? "text-blue-300"
-                            : "text-blue-800"
-                        }`}
-                      >
-                        {insight.message}
-                      </p>
-                      <p
-                        className={`text-[10px] sm:text-xs ${
-                          isDarkMode ? "text-gray-400" : "text-gray-600"
-                        } mt-0.5 sm:mt-1 capitalize`}
-                      >
-                        {insight.priority} priority • {insight.type}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ChartCard>
-        </div>
-
-        {/* Patient Activity */}
-        <ChartCard title="Most Active Patients">
-          <div className="space-y-2 sm:space-y-3 overflow-y-auto flex-1">
-            {analytics.patientActivity &&
-            analytics.patientActivity.length > 0 ? (
-              analytics.patientActivity.map((patient, index) => (
-                <div
-                  key={index}
-                  className={`flex items-center justify-between p-2 sm:p-3 ${
-                    isDarkMode ? "bg-gray-700" : "bg-gray-50"
-                  } rounded-lg transition-colors duration-200 hover:${
-                    isDarkMode ? "bg-gray-600" : "bg-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div
-                      className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: "#2596be" }}
-                    >
-                      <span className="text-white text-xs sm:text-sm font-medium">
-                        {patient.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p
-                        className={`font-medium text-sm sm:text-base truncate ${
-                          isDarkMode ? "text-white" : "text-gray-900"
-                        }`}
-                      >
-                        {patient.name}
-                      </p>
-                      <p
-                        className={`text-[10px] sm:text-sm truncate ${
-                          isDarkMode ? "text-gray-400" : "text-gray-500"
-                        }`}
-                      >
-                        Last activity:{" "}
-                        {new Date(patient.lastActivity).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <p
-                      className="text-base sm:text-lg font-bold"
-                      style={{ color: "#2596be" }}
-                    >
-                      {patient.documents}
-                    </p>
-                    <p
-                      className={`text-[10px] sm:text-xs ${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
-                      documents
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex items-center justify-center h-32">
-                <p
-                  className={`text-sm ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  No patient activity data available
-                </p>
-              </div>
-            )}
-          </div>
-        </ChartCard>
+        )}
       </div>
     </div>
   );

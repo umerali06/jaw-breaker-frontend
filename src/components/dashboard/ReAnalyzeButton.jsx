@@ -26,23 +26,12 @@ const ReAnalyzeButton = ({
         throw new Error("Authentication token not found");
       }
 
-      const response = await fetch(`${API_ENDPOINTS.AI}/analyze/${fileId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Import the analyzeFile function from api.js
+      const { analyzeFile } = await import("../../services/api");
+      const data = await analyzeFile(fileId);
 
-      if (response.ok) {
-        const data = await response.json();
-        onSuccess && onSuccess(data);
-      } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: "Unknown error" }));
-        throw new Error(errorData.message || "Failed to re-analyze document");
-      }
+      // If we get here, the analysis was successful
+      onSuccess && onSuccess(data);
     } catch (error) {
       console.error("Error re-analyzing document:", error);
       onError && onError(error.message || "Failed to re-analyze document");

@@ -189,7 +189,7 @@ export const getAnalysis = async (fileId) => {
 };
 
 // Generate Custom Analysis API
-export const generateCustomAnalysis = async (fileId, prompt) => {
+export const generateCustomAnalysis = async (fileId, prompt, type = null) => {
   try {
     const token = localStorage.getItem("authToken");
     const headers = {
@@ -199,14 +199,24 @@ export const generateCustomAnalysis = async (fileId, prompt) => {
       headers.Authorization = `Bearer ${token}`;
     }
 
+    const requestBody = {};
+    if (prompt) {
+      requestBody.prompt = prompt;
+    }
+    if (type) {
+      requestBody.type = type;
+    }
+
     const response = await fetch(`${API_URL}/ai/custom/${fileId}`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: "Unknown error" }));
       throw new Error(errorData.message || "Error generating custom analysis");
     }
 

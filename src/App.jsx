@@ -8,6 +8,8 @@ import AboutUs from "./pages/AboutUs";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import FileDetailPage from "./pages/FileDetailPage";
+import TestChartPage from "./pages/TestChartPage";
+import AnalyticsTestPage from "./pages/AnalyticsTestPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./contexts/ToastContext";
 
@@ -22,6 +24,11 @@ function App() {
                 <Route path="/" element={<Layout />}>
                   <Route index element={<Home />} />
                   <Route path="about" element={<AboutUs />} />
+                  <Route path="test-chart" element={<TestChartPage />} />
+                  <Route
+                    path="analytics-test"
+                    element={<AnalyticsTestPage />}
+                  />
                   <Route
                     path="file/:id"
                     element={

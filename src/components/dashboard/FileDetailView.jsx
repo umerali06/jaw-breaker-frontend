@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTheme } from "../../contexts/ThemeContext";
 import { API_ENDPOINTS } from "../../config/api";
-import { regenerateAnalysis } from "../../services/api";
+import { regenerateAnalysis, generateCustomAnalysis } from "../../services/api";
 import OASISScoring from "./OASISScoring";
 import SOAPNoteGenerator from "./SOAPNoteGenerator";
 import FileDebugInfo from "./FileDebugInfo";
 import ProcessingStatus from "./ProcessingStatus";
 import ReAnalyzeButton from "./ReAnalyzeButton";
 import AnalysisProgress from "./AnalysisProgress";
+import ReactMarkdown from "react-markdown";
 import {
   FiArrowLeft,
   FiDownload,
@@ -18,6 +19,106 @@ import {
 
 const FileDetailView = ({ file, onBack }) => {
   const { isDarkMode } = useTheme();
+
+  // Ensure we have a valid onBack function
+  const handleBack = () => {
+    if (typeof onBack === "function") {
+      onBack();
+    }
+  };
+
+  // Add CSS for markdown content
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      .markdown-content {
+        font-size: inherit;
+        line-height: 1.6;
+      }
+      .markdown-content p {
+        margin-bottom: 0.75rem;
+      }
+      .markdown-content p:last-child {
+        margin-bottom: 0;
+      }
+      .markdown-content strong {
+        font-weight: 600;
+        color: ${isDarkMode ? "#f7fafc" : "#1a202c"};
+      }
+      .markdown-content em {
+        font-style: italic;
+      }
+      .markdown-content ul, .markdown-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .markdown-content ul {
+        list-style-type: disc;
+      }
+      .markdown-content ol {
+        list-style-type: decimal;
+      }
+      .markdown-content li {
+        margin-bottom: 0.25rem;
+      }
+      .markdown-content h1, .markdown-content h2, .markdown-content h3, 
+      .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+        font-weight: 600;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        color: ${isDarkMode ? "#f7fafc" : "#1a202c"};
+      }
+      .markdown-content h1 { font-size: 1.5rem; }
+      .markdown-content h2 { font-size: 1.25rem; }
+      .markdown-content h3 { font-size: 1.125rem; }
+      .markdown-content h4 { font-size: 1rem; }
+      .markdown-content h5 { font-size: 0.875rem; }
+      .markdown-content h6 { font-size: 0.85rem; }
+      .markdown-content code {
+        background-color: ${isDarkMode ? "#2d3748" : "#f1f5f9"};
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 0.9em;
+      }
+      .markdown-content pre {
+        background-color: ${isDarkMode ? "#2d3748" : "#f1f5f9"};
+        padding: 1rem;
+        border-radius: 0.375rem;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+      }
+      .markdown-content blockquote {
+        border-left: 4px solid ${isDarkMode ? "#4a5568" : "#e2e8f0"};
+        padding-left: 1rem;
+        font-style: italic;
+        margin-bottom: 1rem;
+      }
+      .markdown-content a {
+        color: ${isDarkMode ? "#90cdf4" : "#3182ce"};
+        text-decoration: underline;
+      }
+      .markdown-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+      }
+      .markdown-content th, .markdown-content td {
+        border: 1px solid ${isDarkMode ? "#4a5568" : "#e2e8f0"};
+        padding: 0.5rem;
+        text-align: left;
+      }
+      .markdown-content th {
+        background-color: ${isDarkMode ? "#2d3748" : "#f1f5f9"};
+        font-weight: 600;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, [isDarkMode]);
   const [activeTab, setActiveTab] = useState("summary");
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -46,22 +147,60 @@ const FileDetailView = ({ file, onBack }) => {
     grayLight: "#e2e8f0",
   };
 
+  // Track if analysis is completed to prevent polling loops
+  const analysisCompletedRef = useRef(false);
+
   useEffect(() => {
-    if (file) {
-      fetchAnalysis();
+    if (!file) return;
 
-      if (file.processingStatus === "processing") {
-        const interval = setInterval(() => {
+    console.log(
+      "FileDetailView: File changed, processing status:",
+      file.processingStatus
+    );
+
+    // Always fetch analysis data initially, regardless of completion status
+    // This ensures we get the latest data even if the file was already processed
+    console.log("FileDetailView: Fetching analysis data...");
+    fetchAnalysis();
+
+    // If file is completed and we don't have analysis data yet, don't mark as completed
+    // Let fetchAnalysis determine if we have real data
+    if (file.processingStatus === "completed" && analysis) {
+      analysisCompletedRef.current = true;
+    }
+
+    // Only start polling if file is in processing state and analysis not completed
+    if (
+      file.processingStatus === "processing" &&
+      !analysisCompletedRef.current
+    ) {
+      console.log("FileDetailView: Starting polling for processing file");
+
+      // Clear any existing interval first
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+
+      const interval = setInterval(() => {
+        // Only fetch if not completed
+        if (!analysisCompletedRef.current) {
           fetchAnalysis();
-        }, 3000);
-
-        setPollingInterval(interval);
-
-        return () => {
+        } else {
+          // If completed during interval, clear it
           clearInterval(interval);
           setPollingInterval(null);
-        };
-      } else if (pollingInterval) {
+        }
+      }, 3000);
+
+      setPollingInterval(interval);
+
+      return () => {
+        clearInterval(interval);
+        setPollingInterval(null);
+      };
+    } else {
+      // Clear any existing polling if file is not processing
+      if (pollingInterval) {
         clearInterval(pollingInterval);
         setPollingInterval(null);
       }
@@ -72,15 +211,40 @@ const FileDetailView = ({ file, onBack }) => {
         clearInterval(pollingInterval);
       }
     };
-  }, [file, file?.processingStatus]);
+  }, [file?._id, file?.processingStatus]); // Only depend on file ID and processing status
 
   // Handle analysis completion from AnalysisProgress component
   const handleAnalysisComplete = (result) => {
     if (result) {
+      console.log("Analysis completed with result:", result);
+
+      // Mark analysis as completed to prevent further polling
+      analysisCompletedRef.current = true;
+
+      // Force a refresh of the analysis data
+      setLoading(true);
+
+      // Ensure clinicalInsights is properly formatted
+      if (result.clinicalInsights) {
+        if (typeof result.clinicalInsights === "string") {
+          try {
+            result.clinicalInsights = JSON.parse(result.clinicalInsights);
+          } catch (e) {
+            console.error("Failed to parse clinical insights JSON:", e);
+            result.clinicalInsights = [];
+          }
+        } else if (!Array.isArray(result.clinicalInsights)) {
+          result.clinicalInsights = [];
+        }
+      } else {
+        result.clinicalInsights = [];
+      }
+
       // Update the analysis state with the new data
       setAnalysis((prevAnalysis) => ({
         ...prevAnalysis,
         ...result,
+        processingStatus: "completed", // Force status to completed
       }));
 
       // Update the file object with the new data
@@ -91,9 +255,43 @@ const FileDetailView = ({ file, onBack }) => {
         if (result.clinicalInsights)
           file.clinicalInsights = result.clinicalInsights;
         file.processingStatus = "completed";
+
+        // Stop any polling that might be happening
+        if (pollingInterval) {
+          console.log("Stopping polling interval after analysis completion");
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
       }
 
-      setLoading(false);
+      // Short delay to ensure UI updates properly
+      setTimeout(() => {
+        setLoading(false);
+        setError(null);
+
+        // Set the active tab based on what data is available
+        if (result.summary) {
+          setActiveTab("summary");
+        } else if (
+          result.clinicalInsights &&
+          result.clinicalInsights.length > 0
+        ) {
+          setActiveTab("clinical");
+        } else if (
+          result.soapNote &&
+          Object.keys(result.soapNote || {}).length > 0
+        ) {
+          setActiveTab("soap");
+        } else if (
+          result.oasisScores &&
+          Object.keys(result.oasisScores || {}).length > 0
+        ) {
+          setActiveTab("oasis");
+        } else {
+          // Default to summary tab if no specific data is available
+          setActiveTab("summary");
+        }
+      }, 500);
     }
   };
 
@@ -103,34 +301,157 @@ const FileDetailView = ({ file, onBack }) => {
       return;
     }
 
-    setLoading(true);
+    // Only skip fetch if we already have analysis data AND it's marked as completed
+    if (analysisCompletedRef.current && analysis) {
+      console.log(
+        "FileDetailView: Analysis already completed and data exists, skipping fetch"
+      );
+      if (pollingInterval) {
+        console.log("FileDetailView: Stopping any remaining polling");
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+      return;
+    }
+
+    // Don't show loading for polling requests
+    const isPolling = pollingInterval !== null;
+    if (!isPolling) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        throw new Error("Authentication token not found");
-      }
+      console.log("FileDetailView: Fetching analysis for file:", file._id);
 
-      const response = await fetch(`${API_ENDPOINTS.AI}/analysis/${file._id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Use the getAnalysis function from api.js
+      const { getAnalysis } = await import("../../services/api");
+      const result = await getAnalysis(file._id);
 
-      if (response.ok) {
-        setAnalysis(await response.json());
+      console.log("FileDetailView: Analysis result:", result);
+
+      if (result) {
+        // Ensure clinicalInsights is always an array
+        if (result.clinicalInsights) {
+          if (typeof result.clinicalInsights === "string") {
+            try {
+              result.clinicalInsights = JSON.parse(result.clinicalInsights);
+            } catch (e) {
+              console.error("Failed to parse clinical insights JSON:", e);
+              result.clinicalInsights = [];
+            }
+          } else if (!Array.isArray(result.clinicalInsights)) {
+            result.clinicalInsights = [];
+          }
+        } else {
+          result.clinicalInsights = [];
+        }
+
+        // Check if we have meaningful analysis data (not error responses)
+        const hasRealAnalysisData =
+          (result.summary &&
+            result.summary !== null &&
+            !result.summary.includes("currently unavailable") &&
+            !result.summary.includes("API configuration")) ||
+          (result.clinicalInsights &&
+            result.clinicalInsights.length > 0 &&
+            !result.clinicalInsights.some(
+              (insight) =>
+                insight.message && insight.message.includes("unavailable")
+            )) ||
+          (result.soapNote &&
+            Object.keys(result.soapNote || {}).length > 0 &&
+            !result.soapNote.subjective?.includes("encountered an error")) ||
+          (result.oasisScores &&
+            Object.keys(result.oasisScores || {}).length > 0 &&
+            !Object.values(result.oasisScores).some((score) =>
+              score.rationale?.includes("unavailable")
+            ));
+
+        if (hasRealAnalysisData) {
+          console.log(
+            "FileDetailView: Real analysis data found, treating as completed"
+          );
+
+          // Force status to completed if we have real data
+          result.processingStatus = "completed";
+
+          if (file) {
+            file.processingStatus = "completed";
+          }
+
+          // Mark as completed to prevent further polling
+          analysisCompletedRef.current = true;
+
+          // Stop polling if we have data
+          if (pollingInterval) {
+            console.log(
+              "FileDetailView: Stopping polling due to real data presence"
+            );
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+        } else if (
+          result.summary &&
+          result.summary.includes("currently unavailable")
+        ) {
+          // This is an error response, treat as failed
+          console.log(
+            "FileDetailView: Error response detected, treating as failed"
+          );
+          setError(
+            "AI analysis service is currently unavailable. Please check your Gemini API configuration."
+          );
+          result.processingStatus = "failed";
+
+          if (file) {
+            file.processingStatus = "failed";
+          }
+
+          // Stop polling on error
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+        }
+
+        setAnalysis(result);
+
+        // Update the file object with the latest processing status
+        if (file && result.processingStatus) {
+          file.processingStatus = result.processingStatus;
+
+          // If analysis is completed, stop polling
+          if (result.processingStatus === "completed" && pollingInterval) {
+            console.log("FileDetailView: Analysis completed, stopping polling");
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+
+          // If analysis failed, stop polling
+          if (result.processingStatus === "failed" && pollingInterval) {
+            console.log("FileDetailView: Analysis failed, stopping polling");
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+            setError(result.processingError || "Analysis failed");
+          }
+        }
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: "Unknown error" }));
-        throw new Error(errorData.message || "Failed to fetch analysis");
+        throw new Error("Failed to fetch analysis");
       }
     } catch (error) {
       console.error("Error fetching analysis:", error);
       setError(error.message || "Failed to fetch analysis");
+
+      // Stop polling on error
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
     } finally {
-      setLoading(false);
+      if (!isPolling) {
+        setLoading(false);
+      }
     }
   };
 
@@ -168,7 +489,19 @@ const FileDetailView = ({ file, onBack }) => {
       }
     } catch (error) {
       console.error("Error analyzing document:", error);
-      setError(error.message || "Failed to analyze document");
+
+      // Handle specific error types
+      if (error.message.includes("429") || error.message.includes("quota")) {
+        setError(
+          "API quota exceeded. Please upgrade your Gemini API plan or try again tomorrow."
+        );
+      } else if (error.message.includes("API_KEY_INVALID")) {
+        setError(
+          "Invalid API key. Please check your Gemini API configuration."
+        );
+      } else {
+        setError(error.message || "Failed to analyze document");
+      }
       setLoading(false);
     }
   };
@@ -177,21 +510,82 @@ const FileDetailView = ({ file, onBack }) => {
     setLoading(true);
     setError(null);
 
+    // Reset analysis completion flag to allow new analysis
+    analysisCompletedRef.current = false;
+
     try {
       console.log("Regenerating analysis for file:", file._id);
       const result = await regenerateAnalysis(file._id);
 
       if (result.success) {
-        setTimeout(() => {
-          fetchAnalysis();
-        }, 2000);
+        // After successful regeneration, fetch the latest analysis data
+        console.log("Re-analysis successful, fetching updated data...");
+
+        // Wait a moment for the backend to save the data, then fetch
+        setTimeout(async () => {
+          try {
+            const { getAnalysis } = await import("../../services/api");
+            const updatedAnalysis = await getAnalysis(file._id);
+
+            if (updatedAnalysis) {
+              console.log("Updated analysis fetched:", updatedAnalysis);
+
+              // Ensure clinicalInsights is always an array
+              if (updatedAnalysis.clinicalInsights) {
+                if (typeof updatedAnalysis.clinicalInsights === "string") {
+                  try {
+                    updatedAnalysis.clinicalInsights = JSON.parse(
+                      updatedAnalysis.clinicalInsights
+                    );
+                  } catch (e) {
+                    console.error("Failed to parse clinical insights JSON:", e);
+                    updatedAnalysis.clinicalInsights = [];
+                  }
+                } else if (!Array.isArray(updatedAnalysis.clinicalInsights)) {
+                  updatedAnalysis.clinicalInsights = [];
+                }
+              } else {
+                updatedAnalysis.clinicalInsights = [];
+              }
+
+              setAnalysis(updatedAnalysis);
+              setLoading(false);
+              setError(null);
+              analysisCompletedRef.current = true;
+
+              // Update file status
+              if (file) {
+                file.processingStatus = "completed";
+              }
+            } else {
+              setError("Failed to fetch updated analysis data");
+              setLoading(false);
+            }
+          } catch (fetchError) {
+            console.error("Error fetching updated analysis:", fetchError);
+            setError("Failed to fetch updated analysis data");
+            setLoading(false);
+          }
+        }, 2000); // Wait 2 seconds for backend to save
       } else {
         setError(result.message || "Failed to regenerate analysis");
+        setLoading(false);
       }
     } catch (err) {
       console.error("Error regenerating analysis:", err);
-      setError(err.message || "Failed to regenerate analysis");
-    } finally {
+
+      // Handle specific error types
+      if (err.message.includes("429") || err.message.includes("quota")) {
+        setError(
+          "🚫 API quota exceeded! You've reached the daily limit of 50 requests. Please upgrade your Gemini API plan or try again tomorrow."
+        );
+      } else if (err.message.includes("API_KEY_INVALID")) {
+        setError(
+          "🔑 Invalid API key. Please check your Gemini API configuration."
+        );
+      } else {
+        setError(err.message || "Failed to regenerate analysis");
+      }
       setLoading(false);
     }
   };
@@ -212,6 +606,32 @@ const FileDetailView = ({ file, onBack }) => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  // Function to safely parse JSON strings if needed
+  const parseJsonIfString = (data) => {
+    if (!data) return null;
+    if (typeof data === "string") {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return data;
+      }
+    }
+    return data;
+  };
+
+  // Function to render markdown content
+  const renderMarkdown = (content) => {
+    if (!content) return null;
+    if (typeof content === "string") {
+      return (
+        <div className="markdown-content">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      );
+    }
+    return content;
   };
 
   const getStatusConfig = (status) => {
@@ -466,13 +886,39 @@ const FileDetailView = ({ file, onBack }) => {
                 >
                   AI analysis is currently unavailable
                 </h3>
-                <p
+                <div
                   className={`text-sm mb-4 ${
                     isDarkMode ? "text-red-200" : "text-red-700"
                   }`}
                 >
-                  {error}. Please try again later or enter data manually below.
-                </p>
+                  <p className="mb-2">{error}</p>
+                  {error.includes("quota") && (
+                    <div className="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                      <p className="text-yellow-800 dark:text-yellow-200 text-xs font-medium">
+                        💡 <strong>Quick Fix:</strong> The Gemini API free tier
+                        allows 50 requests per day. You can either:
+                      </p>
+                      <ul className="text-yellow-800 dark:text-yellow-200 text-xs mt-2 ml-4 list-disc">
+                        <li>Wait 24 hours for quota reset</li>
+                        <li>
+                          Upgrade to a paid plan at{" "}
+                          <a
+                            href="https://aistudio.google.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            Google AI Studio
+                          </a>
+                        </li>
+                        <li>Use manual entry below as a temporary solution</li>
+                      </ul>
+                    </div>
+                  )}
+                  <p className="mt-2">
+                    Please try again later or enter data manually below.
+                  </p>
+                </div>
                 <div className="flex space-x-3">
                   <button
                     onClick={fetchAnalysis}
@@ -645,9 +1091,9 @@ const FileDetailView = ({ file, onBack }) => {
               } mb-4`}
             >
               <svg
-                className="w-10 h-10"
+                className="w-10 h-10 text-gray-400"
                 fill="none"
-                stroke={isDarkMode ? colors.primaryLight : colors.primary}
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path
@@ -659,80 +1105,37 @@ const FileDetailView = ({ file, onBack }) => {
               </svg>
             </div>
             <h3
-              className={`text-lg font-bold mb-3 ${
+              className={`text-lg font-bold mb-2 ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
             >
-              No analysis available for this document
+              No analysis data available
             </h3>
             <p
               className={`text-sm mb-6 ${
                 isDarkMode ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              Click the button below to analyze this document and extract
-              clinical insights automatically.
+              This document hasn't been analyzed yet. Click the button below to
+              start the analysis process.
             </p>
             <button
               onClick={triggerAnalysis}
-              disabled={loading}
-              className={`px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              } ${
-                isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"
-              } flex items-center mx-auto`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity flex items-center mx-auto ${
+                isDarkMode ? "bg-blue-700 text-white" : "bg-blue-600 text-white"
+              }`}
             >
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-                    />
-                  </svg>
-                  Analyze Document
-                </>
-              )}
+              <FiPlay className="mr-2" />
+              Start Analysis
             </button>
           </div>
         </div>
       );
     }
 
-    return (
-      <div className="space-y-6">
-        {activeTab === "summary" && (
+    switch (activeTab) {
+      case "summary":
+        return (
           <div
             className={`p-6 rounded-xl border ${
               isDarkMode
@@ -740,14 +1143,300 @@ const FileDetailView = ({ file, onBack }) => {
                 : "border-gray-200 bg-white"
             }`}
           >
-            <div className="flex items-center mb-4">
+            <h3
+              className={`text-lg font-bold mb-4 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Document Summary
+            </h3>
+            {analysis.summary ? (
               <div
-                className={`p-2 rounded-lg ${
-                  isDarkMode ? "bg-blue-900 bg-opacity-30" : "bg-blue-100"
-                } mr-3`}
+                className={`prose max-w-none ${
+                  isDarkMode ? "prose-invert" : ""
+                }`}
+              >
+                {renderMarkdown(analysis.summary)}
+              </div>
+            ) : (
+              <p
+                className={`text-sm italic ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                No summary available for this document.
+              </p>
+            )}
+          </div>
+        );
+      case "clinical":
+        return (
+          <div
+            className={`p-6 rounded-xl border ${
+              isDarkMode
+                ? "border-gray-700 bg-gray-800"
+                : "border-gray-200 bg-white"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+              <h3
+                className={`text-lg font-bold ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Clinical Insights
+              </h3>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() =>
+                    exportToJson(
+                      analysis.clinicalInsights || [],
+                      `clinical-insights-${file._id}.json`
+                    )
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${
+                    isDarkMode
+                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  <svg
+                    className="w-3.5 h-3.5 mr-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  Export
+                </button>
+              </div>
+            </div>
+
+            {analysis.clinicalInsights &&
+            analysis.clinicalInsights.length > 0 ? (
+              <div className="space-y-4">
+                {analysis.clinicalInsights.map((insight, index) => (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-lg border ${
+                      isDarkMode
+                        ? "border-gray-700 bg-gray-700/30"
+                        : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center">
+                        <span
+                          className={`px-2 py-1 text-xs font-bold rounded-md mr-2 ${getPriorityBadge(
+                            insight.priority
+                          )}`}
+                        >
+                          {insight.priority || "medium"}
+                        </span>
+                        <span
+                          className={`text-xs font-medium ${
+                            isDarkMode ? "text-gray-300" : "text-gray-500"
+                          }`}
+                          title={getTypeTooltip(insight.type)}
+                        >
+                          {insight.type || "observation"}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => copyToClipboard(insight.content)}
+                          className={`p-1 rounded ${
+                            isDarkMode
+                              ? "hover:bg-gray-600 text-gray-400"
+                              : "hover:bg-gray-200 text-gray-500"
+                          }`}
+                          title="Copy to clipboard"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="prose prose-sm max-w-none">
+                      {renderMarkdown(insight.content)}
+                    </div>
+                    {insight.recommendation && (
+                      <div
+                        className={`mt-3 pt-3 border-t ${
+                          isDarkMode
+                            ? "border-gray-600 text-blue-300"
+                            : "border-gray-200 text-blue-700"
+                        }`}
+                      >
+                        <p className="text-sm font-medium flex items-start">
+                          <svg
+                            className="w-4 h-4 mr-1 mt-0.5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span>{insight.recommendation}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p
+                className={`text-sm italic ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                No clinical insights available for this document.
+              </p>
+            )}
+          </div>
+        );
+      case "soap":
+        return (
+          <SOAPNoteGenerator
+            file={file}
+            analysis={analysis}
+            onUpdate={handleSOAPUpdate}
+            isDarkMode={isDarkMode}
+          />
+        );
+      case "oasis":
+        return (
+          <OASISScoring
+            file={file}
+            analysis={analysis}
+            onUpdate={handleOASISUpdate}
+            isDarkMode={isDarkMode}
+          />
+        );
+      case "debug":
+        return <FileDebugInfo file={file} analysis={analysis} />;
+      default:
+        return (
+          <div className="p-6 text-center">
+            <p
+              className={`text-sm italic ${
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
+              Select a tab to view analysis details.
+            </p>
+          </div>
+        );
+    }
+  };
+
+  if (!file) {
+    return (
+      <div
+        className={`p-8 rounded-xl border ${
+          isDarkMode
+            ? "border-gray-700 bg-gray-800"
+            : "border-gray-200 bg-gray-50"
+        } text-center`}
+      >
+        <div className="max-w-md mx-auto">
+          <div
+            className={`p-4 rounded-full inline-flex items-center justify-center ${
+              isDarkMode ? "bg-gray-700" : "bg-white"
+            } mb-4`}
+          >
+            <svg
+              className="w-10 h-10 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <h3
+            className={`text-lg font-bold mb-2 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
+            No file selected
+          </h3>
+          <p
+            className={`text-sm ${
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
+            Please select a file to view its details.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <button
+        onClick={handleBack}
+        className={`mb-4 sm:mb-6 flex items-center text-sm sm:text-base font-medium px-3 py-2 rounded-lg ${
+          isDarkMode
+            ? "bg-gray-700 text-blue-400 hover:bg-gray-600"
+            : "bg-white text-blue-600 hover:bg-blue-50"
+        } transition-colors shadow-sm`}
+      >
+        <FiArrowLeft className="mr-1.5 sm:mr-2" /> Back to Documents
+      </button>
+
+      <div
+        className={`p-6 rounded-xl border ${
+          isDarkMode
+            ? "border-gray-700 bg-gray-800"
+            : "border-gray-200 bg-white"
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2
+              className={`text-xl sm:text-2xl font-bold mb-1 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {file.originalname}
+            </h2>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div
+                className={`flex items-center text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
               >
                 <svg
-                  className="w-5 h-5 text-blue-500"
+                  className="w-4 h-4 mr-1.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -755,677 +1444,193 @@ const FileDetailView = ({ file, onBack }) => {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={1.5}
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                {formatDate(file.createdAt)}
+              </div>
+              <div
+                className={`flex items-center text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                <svg
+                  className="w-4 h-4 mr-1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
+                {file.mimetype || "Unknown type"}
               </div>
-              <h3
-                className={`text-lg font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Summary & Clinical Insights
-              </h3>
-            </div>
-
-            {analysis.summary || file.aiSummary ? (
               <div
-                className={`p-4 rounded-lg ${
-                  isDarkMode ? "bg-gray-700" : "bg-gray-50"
+                className={`flex items-center text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <button
-                    className="px-2 sm:px-3 py-1 rounded bg-[#2596be] text-white text-xs font-bold hover:bg-[#1d7a9c] flex-shrink-0"
-                    onClick={() =>
-                      copyToClipboard(analysis.summary || file.aiSummary)
-                    }
-                  >
-                    <span className="hidden sm:inline">Copy Summary</span>
-                    <span className="sm:hidden">Copy</span>
-                  </button>
-                  <button
-                    className="px-2 sm:px-3 py-1 rounded bg-[#96be25] text-white text-xs font-bold hover:bg-[#7a9c1d] flex-shrink-0"
-                    onClick={() =>
-                      exportToJson(
-                        analysis.summary || file.aiSummary,
-                        `${file.originalname}-summary.json`
-                      )
-                    }
-                  >
-                    <span className="hidden sm:inline">Export Summary</span>
-                    <span className="sm:hidden">Export</span>
-                  </button>
-                  <button
-                    className="px-2 sm:px-3 py-1 rounded bg-[#e74c3c] text-white text-xs font-bold hover:bg-[#c0392b] flex items-center flex-shrink-0"
-                    onClick={async () => {
-                      try {
-                        setLoading(true);
-                        const token = localStorage.getItem("authToken");
-                        const response = await fetch(
-                          `${API_ENDPOINTS.AI}/custom/${file._id}`,
-                          {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({
-                              type: "summary",
-                            }),
-                          }
-                        );
-
-                        if (response.ok) {
-                          const data = await response.json();
-                          setAnalysis((prev) => ({
-                            ...prev,
-                            summary: data.result,
-                          }));
-                          if (file) {
-                            file.aiSummary = data.result;
-                          }
-                        } else {
-                          throw new Error("Failed to regenerate summary");
-                        }
-                      } catch (error) {
-                        console.error("Error regenerating summary:", error);
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                    <span className="hidden sm:inline">Regenerate</span>
-                    <span className="sm:hidden">Regen</span>
-                  </button>
-                </div>
-                <p
-                  className={`whitespace-pre-wrap font-medium ${
-                    isDarkMode ? "text-gray-200" : "text-gray-700"
-                  }`}
+                <svg
+                  className="w-4 h-4 mr-1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  {analysis.summary || file.aiSummary}
-                </p>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
+                </svg>
+                {file.size
+                  ? `${(file.size / 1024).toFixed(2)} KB`
+                  : "Unknown size"}
               </div>
-            ) : (
-              <div
-                className={`p-8 text-center rounded-lg ${
-                  isDarkMode ? "bg-gray-700" : "bg-gray-50"
-                }`}
-              >
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  } mb-4`}
-                >
-                  No summary available for this document
-                </p>
-                <button
-                  className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 flex items-center mx-auto"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      const token = localStorage.getItem("authToken");
-                      const response = await fetch(
-                        `${API_ENDPOINTS.AI}/custom/${file._id}`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({
-                            type: "summary",
-                          }),
-                        }
-                      );
-
-                      if (response.ok) {
-                        const data = await response.json();
-                        setAnalysis((prev) => ({
-                          ...prev,
-                          summary: data.result,
-                        }));
-                        if (file) {
-                          file.aiSummary = data.result;
-                        }
-                      } else {
-                        throw new Error("Failed to generate summary");
-                      }
-                    } catch (error) {
-                      console.error("Error generating summary:", error);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                >
-                  <svg
-                    className="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Generate Summary
-                </button>
-              </div>
-            )}
-            {/* Clinical Insights */}
-            <div className="mt-6">
-              <div className="flex flex-wrap items-center justify-between mb-2">
-                <h4 className="font-bold text-base text-gray-700 flex items-center mb-2 sm:mb-0">
-                  Clinical Insights
-                </h4>
-
-                <button
-                  className="px-2 sm:px-3 py-1 rounded bg-[#e74c3c] text-white text-xs font-bold hover:bg-[#c0392b] flex items-center"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      const token = localStorage.getItem("authToken");
-                      const response = await fetch(
-                        `${API_ENDPOINTS.AI}/custom/${file._id}`,
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({
-                            type: "insights",
-                          }),
-                        }
-                      );
-
-                      if (response.ok) {
-                        const data = await response.json();
-                        setAnalysis((prev) => ({
-                          ...prev,
-                          clinicalInsights: data.result,
-                        }));
-                        if (file) {
-                          file.clinicalInsights = data.result;
-                        }
-                      } else {
-                        throw new Error("Failed to regenerate insights");
-                      }
-                    } catch (error) {
-                      console.error("Error regenerating insights:", error);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                >
-                  <svg
-                    className="w-3 h-3 mr-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Regenerate Insights</span>
-                  <span className="sm:hidden">Regen</span>
-                </button>
-              </div>
-
-              {Array.isArray(analysis.clinicalInsights) &&
-              analysis.clinicalInsights.length > 0 ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <button
-                      className="px-2 sm:px-3 py-1 rounded bg-[#2596be] text-white text-xs font-bold hover:bg-[#1d7a9c] flex-shrink-0"
-                      onClick={() =>
-                        copyToClipboard(
-                          JSON.stringify(analysis.clinicalInsights, null, 2)
-                        )
-                      }
-                    >
-                      <span className="hidden sm:inline">Copy Insights</span>
-                      <span className="sm:hidden">Copy</span>
-                    </button>
-                    <button
-                      className="px-2 sm:px-3 py-1 rounded bg-[#96be25] text-white text-xs font-bold hover:bg-[#7a9c1d] flex-shrink-0"
-                      onClick={() =>
-                        exportToJson(
-                          analysis.clinicalInsights,
-                          `${file.originalname}-insights.json`
-                        )
-                      }
-                    >
-                      <span className="hidden sm:inline">Export Insights</span>
-                      <span className="sm:hidden">Export</span>
-                    </button>
-                  </div>
-                  <ul className="space-y-3">
-                    {analysis.clinicalInsights.map((insight, idx) => (
-                      <li
-                        key={idx}
-                        className="p-3 rounded-lg border border-gray-200 bg-white dark:bg-gray-700 flex flex-col gap-1"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-bold ${getPriorityBadge(
-                              insight.priority
-                            )}`}
-                          >
-                            {insight.priority || "info"}
-                          </span>
-                          <span
-                            className="text-xs text-gray-500"
-                            title={getTypeTooltip(insight.type)}
-                          >
-                            {insight.type}
-                            <svg
-                              className="inline ml-1 w-3 h-3 text-gray-400"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M12 16v-4m0-4h.01"
-                              />
-                            </svg>
-                          </span>
-                        </div>
-                        <div
-                          className={`text-sm ${
-                            isDarkMode ? "text-gray-200" : "text-gray-700"
-                          }`}
-                        >
-                          {insight.message}
-                        </div>
-                        {insight.evidence && (
-                          <div className="text-xs mt-1 text-gray-400">
-                            Evidence: {insight.evidence}
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <div className="p-8 text-center rounded-lg bg-gray-50 dark:bg-gray-700">
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    No clinical insights available for this document
-                  </p>
-                  <button
-                    className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 flex items-center mx-auto"
-                    onClick={async () => {
-                      try {
-                        setLoading(true);
-                        const token = localStorage.getItem("authToken");
-                        const response = await fetch(
-                          `${API_ENDPOINTS.AI}/custom/${file._id}`,
-                          {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${token}`,
-                            },
-                            body: JSON.stringify({
-                              type: "insights",
-                            }),
-                          }
-                        );
-
-                        if (response.ok) {
-                          const data = await response.json();
-                          setAnalysis((prev) => ({
-                            ...prev,
-                            clinicalInsights: data.result,
-                          }));
-                          if (file) {
-                            file.clinicalInsights = data.result;
-                          }
-                        } else {
-                          throw new Error("Failed to generate insights");
-                        }
-                      } catch (error) {
-                        console.error("Error generating insights:", error);
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    <svg
-                      className="w-4 h-4 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                    Generate Insights
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        )}
-        {activeTab === "oasis" && (
-          <OASISScoring
-            file={file}
-            analysis={analysis}
-            scores={analysis.oasisScores || {}}
-            onUpdate={handleOASISUpdate}
-            primaryColor={colors.primary}
-            accentColor={colors.accent}
-            isDarkMode={isDarkMode}
-          />
-        )}
-        {activeTab === "soap" && (
-          <SOAPNoteGenerator
-            file={file}
-            analysis={analysis}
-            note={analysis.soapNote || ""}
-            onUpdate={handleSOAPUpdate}
-            primaryColor={colors.primary}
-            accentColor={colors.accent}
-            isDarkMode={isDarkMode}
-          />
-        )}
-      </div>
-    );
-  };
-
-  // Helper: file type icon/avatar
-  const getFileAvatar = () => {
-    let bg = colors.primary;
-    let icon = <FiFileText size={22} color="#fff" />;
-    if (file.mimetype?.includes("pdf")) {
-      bg = "#e53e3e";
-      icon = (
-        <svg
-          className="w-6 h-6 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
-          />
-        </svg>
-      );
-    } else if (file.mimetype?.includes("image")) {
-      bg = colors.accent;
-      icon = (
-        <svg
-          className="w-6 h-6 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.5 3.5-4.5 4.5 6H5l3.5-5z"
-          />
-        </svg>
-      );
-    }
-    return (
-      <div
-        className="flex items-center justify-center rounded-full shadow-md"
-        style={{ background: bg, width: 48, height: 48 }}
-      >
-        {icon}
-      </div>
-    );
-  };
-
-  if (!file) return null;
-
-  return (
-    <div className="w-full p-2 sm:p-4 md:p-6">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className={`flex items-center mb-4 sm:mb-6 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm shadow-sm border border-transparent ${
-          isDarkMode
-            ? "bg-gray-800 hover:bg-gray-700 text-blue-400"
-            : "bg-white hover:bg-gray-50 text-[#2596be]"
-        } focus:outline-none focus:ring-2 focus:ring-[#96be25]`}
-        style={{ boxShadow: "0 1px 4px 0 rgba(37,150,190,0.08)" }}
-      >
-        <FiArrowLeft className="mr-1.5 sm:mr-2" /> Back to Documents
-      </button>
-
-      {/* Main File Card */}
-      <div
-        className={`rounded-xl sm:rounded-2xl md:rounded-3xl shadow-lg sm:shadow-xl p-3 sm:p-4 md:p-6 flex flex-col md:flex-row items-center md:items-start gap-3 sm:gap-4 md:gap-6 ${
-          isDarkMode
-            ? "bg-gray-800 border-2 border-gray-700"
-            : "bg-[#f6fcf3] border-2 border-[#96be25]"
-        } mb-4 sm:mb-6 md:mb-8`}
-        style={{
-          boxShadow: isDarkMode ? "none" : "0 4px 24px 0 rgba(150,190,37,0.08)",
-        }}
-      >
-        {/* Avatar on top for mobile */}
-        <div className="mb-2 sm:mb-3 md:mb-0 md:mr-4 flex-shrink-0 flex flex-col items-center w-full md:w-auto">
-          {getFileAvatar()}
-        </div>
-        <div className="flex-1 w-full">
-          {/* File Name & Metadata */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div className="min-w-0">
-              <h2
-                className={`text-base sm:text-lg md:text-xl font-bold flex items-center mb-1 sm:mb-2 truncate ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {file.originalname}
-              </h2>
-              <div className="flex flex-wrap gap-1 sm:gap-2 mt-1 text-[10px] sm:text-xs font-medium">
-                <span
-                  className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border ${
-                    isDarkMode
-                      ? "border-gray-700 bg-gray-700 text-gray-300"
-                      : "border-[#e2e8f0] bg-white text-gray-600"
-                  }`}
-                >
-                  Type: {file.mimetype || "Unknown"}
-                </span>
-                <span
-                  className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border ${
-                    isDarkMode
-                      ? "border-gray-700 bg-gray-700 text-gray-300"
-                      : "border-[#e2e8f0] bg-white text-gray-600"
-                  }`}
-                >
-                  Size:{" "}
-                  {file.size
-                    ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
-                    : "-"}
-                </span>
-                <span
-                  className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border ${
-                    isDarkMode
-                      ? "border-gray-700 bg-gray-700 text-gray-300"
-                      : "border-[#e2e8f0] bg-white text-gray-600"
-                  }`}
-                >
-                  Uploaded: {formatDate(file.createdAt)}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-2 md:mt-0">
-              <span
-                className="px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-full"
-                style={{
-                  backgroundColor: isDarkMode
-                    ? `${getStatusConfig(file.processingStatus).color}30`
-                    : getStatusConfig(file.processingStatus).bg,
-                  color: getStatusConfig(file.processingStatus).color,
-                }}
-              >
-                {getStatusConfig(file.processingStatus).icon}
-                <span className="ml-1">
-                  {file.processingStatus === "processing" && "Processing"}
-                  {file.processingStatus === "pending" && "Pending"}
-                  {file.processingStatus === "completed" && "Complete"}
-                  {file.processingStatus === "failed" && "Failed"}
-                </span>
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Actions Section */}
-          <div className="mt-3 sm:mt-4 md:mt-6">
-            <h3
-              className={`font-bold text-xs sm:text-sm mb-1.5 sm:mb-2 flex items-center ${
-                isDarkMode ? "text-gray-300" : "text-gray-800"
+          <div className="flex flex-wrap gap-2">
+            <ReAnalyzeButton
+              fileId={file._id}
+              onSuccess={(data) => {
+                console.log("Re-analysis started:", data);
+                setLoading(true);
+                setError(null);
+                fetchAnalysis();
+              }}
+              onError={(error) => {
+                setError(error);
+                setLoading(false);
+              }}
+              buttonText="Re-analyze"
+              buttonClassName={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${
+                isDarkMode
+                  ? "bg-blue-700 text-white hover:bg-blue-600"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+              iconClassName="w-3.5 h-3.5 mr-1"
+            />
+            <button
+              onClick={() => {
+                console.log("Refreshing analysis data...");
+                analysisCompletedRef.current = false;
+                setLoading(true);
+                setError(null);
+                fetchAnalysis();
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${
+                isDarkMode
+                  ? "bg-green-700 text-white hover:bg-green-600"
+                  : "bg-green-600 text-white hover:bg-green-700"
               }`}
             >
-              <FiFileText className="mr-1.5 sm:mr-2 text-[#2596be]" /> Quick
-              Actions
-            </h3>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button
-                onClick={() => {
-                  const token = localStorage.getItem("authToken");
-                  const downloadUrl = `${API_ENDPOINTS.UPLOAD}/download/${file._id}`;
-
-                  // Create a hidden form to submit the token with the request
-                  const form = document.createElement("form");
-                  form.method = "GET";
-                  form.action = downloadUrl;
-                  form.target = "_blank";
-
-                  // Add the token as a hidden field
-                  const tokenField = document.createElement("input");
-                  tokenField.type = "hidden";
-                  tokenField.name = "token";
-                  tokenField.value = token;
-                  form.appendChild(tokenField);
-
-                  // Submit the form
-                  document.body.appendChild(form);
-                  form.submit();
-                  document.body.removeChild(form);
-                }}
-                className="flex-1 flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#2596be] text-white font-medium text-xs sm:text-sm shadow hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all"
-              >
-                <FiDownload className="mr-1.5 sm:mr-2" /> Download
-              </button>
-              {file.processingStatus === "pending" && (
-                <button
-                  onClick={triggerAnalysis}
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#96be25] text-white font-medium text-xs sm:text-sm shadow hover:bg-[#7a9c1d] focus:outline-none focus:ring-2 focus:ring-[#96be25] disabled:opacity-60 transition-all"
-                >
-                  <FiPlay className="mr-1.5 sm:mr-2" /> Analyze
-                </button>
-              )}
-              {file.processingStatus === "failed" && (
-                <button
-                  onClick={retryAnalysis}
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-red-500 text-white font-medium text-xs sm:text-sm shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-60 transition-all"
-                >
-                  <FiRefreshCw className="mr-1.5 sm:mr-2" /> Retry
-                </button>
-              )}
-            </div>
+              <FiRefreshCw className="w-3.5 h-3.5 mr-1" />
+              Refresh Data
+            </button>
+            <button
+              onClick={() => {
+                const token = localStorage.getItem("authToken");
+                const url = `/api/upload/download/${file._id}`;
+                const a = document.createElement("a");
+                a.href = url;
+                a.setAttribute("download", file.originalname);
+                a.setAttribute("target", "_blank");
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${
+                isDarkMode
+                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              <FiDownload className="mr-1.5" />
+              Download
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Tabs Section */}
-      <div
-        className={`rounded-xl sm:rounded-2xl ${
-          isDarkMode
-            ? "bg-gray-800 border border-gray-700"
-            : "bg-[#f8fafc] border border-[#e2e8f0]"
-        } shadow-lg mb-4 sm:mb-6 md:mb-8`}
-      >
-        <nav className="flex flex-wrap space-x-1 sm:space-x-2 md:space-x-4 px-2 sm:px-3 md:px-4 pt-2 sm:pt-3 md:pt-4 overflow-x-auto">
-          {[
-            { id: "summary", label: "Summary", icon: "📋" },
-            { id: "oasis", label: "OASIS", icon: "📊" },
-            { id: "soap", label: "SOAP", icon: "📝" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg font-medium text-xs sm:text-sm flex items-center transition-all duration-150 ${
-                activeTab === tab.id
-                  ? isDarkMode
-                    ? "bg-gray-700 text-blue-400"
-                    : "bg-white shadow text-[#2596be]"
-                  : isDarkMode
-                  ? "text-gray-400 hover:text-gray-300"
-                  : "text-gray-500 hover:text-[#2596be]"
-              } focus:outline-none focus:ring-2 focus:ring-[#2596be]`}
-              style={{
-                borderBottom:
-                  activeTab === tab.id
-                    ? `3px solid ${isDarkMode ? "#3b82f6" : "#2596be"}`
-                    : "3px solid transparent",
-              }}
-            >
-              <span className="mr-1 sm:mr-2">{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="inline sm:hidden">
-                {tab.label.substring(0, 3)}
-              </span>
-            </button>
-          ))}
-        </nav>
-        <div className="p-2 sm:p-3 md:p-4">
-          {/* Section Heading */}
-          <h4
-            className={`font-bold text-sm sm:text-base mb-2 sm:mb-4 border-b pb-1 sm:pb-2 ${
-              isDarkMode
-                ? "text-gray-300 border-gray-700"
-                : "text-gray-700 border-[#e2e8f0]"
-            }`}
-          >
-            File Details
-          </h4>
-          <FileDebugInfo file={file} isDarkMode={isDarkMode} />
-          {renderTabContent()}
-        </div>
+      <div className="flex flex-wrap gap-2 border-b border-opacity-20 pb-1">
+        <button
+          onClick={() => setActiveTab("summary")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "summary"
+              ? isDarkMode
+                ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                : "bg-white text-blue-600 border-b-2 border-blue-500"
+              : isDarkMode
+              ? "text-gray-400 hover:text-gray-300"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Summary
+        </button>
+        <button
+          onClick={() => setActiveTab("clinical")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "clinical"
+              ? isDarkMode
+                ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                : "bg-white text-blue-600 border-b-2 border-blue-500"
+              : isDarkMode
+              ? "text-gray-400 hover:text-gray-300"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Clinical Insights
+        </button>
+        <button
+          onClick={() => setActiveTab("soap")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "soap"
+              ? isDarkMode
+                ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                : "bg-white text-blue-600 border-b-2 border-blue-500"
+              : isDarkMode
+              ? "text-gray-400 hover:text-gray-300"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          SOAP Note
+        </button>
+        <button
+          onClick={() => setActiveTab("oasis")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "oasis"
+              ? isDarkMode
+                ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                : "bg-white text-blue-600 border-b-2 border-blue-500"
+              : isDarkMode
+              ? "text-gray-400 hover:text-gray-300"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          OASIS Scoring
+        </button>
+        <button
+          onClick={() => setActiveTab("debug")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "debug"
+              ? isDarkMode
+                ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                : "bg-white text-blue-600 border-b-2 border-blue-500"
+              : isDarkMode
+              ? "text-gray-400 hover:text-gray-300"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Debug
+        </button>
       </div>
+
+      <div className="mt-4">{renderTabContent()}</div>
     </div>
   );
 };

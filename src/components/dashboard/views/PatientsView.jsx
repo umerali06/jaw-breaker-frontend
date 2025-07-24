@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from "../../../config/api";
 import EditPatientModal from "../EditPatientModal";
 import jsPDF from "jspdf";
 
-const PatientsView = ({
+const PatientsView = ({ 
   selectedPatient,
   onPatientSelect,
   viewMode: propViewMode,
@@ -162,60 +162,60 @@ const PatientsView = ({
     const initial = patient.name ? patient.name.charAt(0).toUpperCase() : "?";
     return (
       <div
-        className={`min-h-[320px] w-full max-w-sm rounded-2xl shadow-lg border border-[#e2e8f0] bg-white dark:bg-[#232b36] flex flex-col gap-3 p-4 sm:p-6 transition-all hover:scale-[1.02] hover:shadow-2xl hover:border-[#2596be] duration-200 ease-in-out overflow-hidden`}
+        className={`h-full w-full rounded-2xl shadow-lg border border-[#e2e8f0] bg-white dark:bg-[#232b36] flex flex-col gap-2 p-3 sm:p-6 transition-all hover:scale-[1.02] hover:shadow-2xl hover:border-[#2596be] duration-200 ease-in-out`}
       >
         {/* Avatar and Status */}
         <div className="flex items-center justify-between mb-2 gap-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <div
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-md border-4 border-white dark:border-[#232b36]"
+              className="w-10 h-10 sm:w-14 sm:h-14 rounded-full flex-shrink-0 flex items-center justify-center text-xl sm:text-3xl font-bold text-white shadow-md border-4 border-white dark:border-[#232b36]"
               style={{ background: "#2596be" }}
             >
               {initial}
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold mb-0.5 truncate text-gray-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm sm:text-lg font-bold mb-0.5 truncate text-gray-900 dark:text-white">
                 {patient.name}
               </h3>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-300 break-all truncate">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-300 truncate">
                 ID: {patient.id}
               </p>
             </div>
           </div>
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-400 text-white shadow min-w-[60px] text-center">
+          <span className="px-2 sm:px-3 py-1 text-xs font-bold rounded-full bg-gray-400 text-white shadow min-w-[60px] text-center flex-shrink-0">
             {(patient.status || "").charAt(0).toUpperCase() +
               (patient.status || "").slice(1)}
           </span>
         </div>
 
         {/* Info Section */}
-        <div className="flex justify-between items-center gap-4 border-b border-[#e2e8f0] pb-3">
+        <div className="flex justify-between items-center gap-2 sm:gap-4 border-b border-[#e2e8f0] pb-3">
           <div className="text-center flex-1">
             <p className="text-xs font-bold text-gray-500">Documents</p>
-            <p className="text-lg font-bold text-[#2596be]">
+            <p className="text-base sm:text-lg font-bold text-[#2596be]">
               {(patient.files || []).length}
             </p>
           </div>
           <div className="text-center flex-1">
             <p className="text-xs font-bold text-gray-500">Last Updated</p>
-            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+            <p className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200">
               {new Date(patient.lastUpdated).toLocaleDateString()}
             </p>
           </div>
         </div>
 
         {/* Recent Documents */}
-        <div className="mt-2">
+        <div className="mt-2 flex-1 overflow-hidden">
           <p className="text-xs font-bold text-gray-500 mb-2">
             Recent Documents
           </p>
-          <div className="space-y-2">
+          <div className="space-y-2 overflow-hidden">
             {(patient.files || []).slice(0, 3).map((file) => (
               <div
                 key={file._id || file.id || file.originalname}
                 className="flex items-center text-xs font-medium text-gray-600 dark:text-gray-300"
               >
-                <div className="p-1.5 mr-2 bg-[#2596be] rounded-lg">
+                <div className="p-1.5 mr-2 bg-[#2596be] rounded-lg flex-shrink-0">
                   <svg
                     className="w-3 h-3 text-white"
                     fill="none"
@@ -245,16 +245,16 @@ const PatientsView = ({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-auto pt-4">
+        <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-3 sm:pt-4">
           <button
             onClick={() => onPatientSelect && onPatientSelect(patient)}
-            className="w-full sm:w-auto bg-[#2596be] text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all shadow-md"
+            className="w-full bg-[#2596be] text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all shadow-md"
           >
             View Details
           </button>
           <button
             onClick={() => handleGenerateSOAPClick(patient)}
-            className="w-full sm:w-auto border border-[#e2e8f0] text-[#2596be] bg-white dark:bg-[#232b36] px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold hover:bg-[#f6fcf3] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#96be25] transition-all shadow-md focus-visible:z-10"
+            className="w-full border border-[#e2e8f0] text-[#2596be] bg-white dark:bg-[#232b36] px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#f6fcf3] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#96be25] transition-all shadow-md focus-visible:z-10"
             tabIndex={0}
           >
             Generate SOAP
@@ -633,14 +633,9 @@ const PatientsView = ({
         </div>
 
         {/* Patients Grid */}
-        <div
-          className="grid gap-1 sm:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-          style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
-          }}
-        >
+        <div className="grid gap-4 sm:gap-6 grid-auto-fit">
           {filteredAndSortedPatients.map((patient) => (
-            <div key={patient._id || patient.id} className="h-full flex">
+            <div key={patient._id || patient.id} className="h-full">
               <PatientCard patient={patient} />
             </div>
           ))}

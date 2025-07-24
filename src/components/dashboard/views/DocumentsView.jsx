@@ -226,19 +226,19 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
 
   const DocumentCard = ({ file }) => (
     <div
-      className={`rounded-xl sm:rounded-3xl shadow-lg sm:shadow-xl p-3 sm:p-6 border-2 border-[#96be25] hover:shadow-2xl hover:border-[#2596be] transition-all flex flex-col h-full max-w-sm w-full ${
+      className={`rounded-3xl shadow-xl p-6 border-2 border-[#96be25] hover:shadow-2xl hover:border-[#2596be] transition-all flex flex-col h-full max-w-sm w-full ${
         isDarkMode ? "bg-[#232b36]" : "bg-[#f6fcf3]"
       }`}
       style={{ boxShadow: "0 4px 24px 0 rgba(150,190,37,0.08)" }}
     >
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          <div className="p-1.5 sm:p-2 rounded-full bg-[#2596be] flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="p-2 rounded-full bg-[#2596be] flex items-center justify-center">
             {getFileIcon(file.mimetype)}
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="ml-3 min-w-0 flex-1">
             <h3
-              className={`text-sm sm:text-base font-bold truncate ${
+              className={`text-base font-bold truncate ${
                 isDarkMode ? "text-white" : "text-gray-900"
               }`}
               title={file.originalname}
@@ -246,7 +246,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
               {file.originalname}
             </h3>
             <p
-              className={`text-[10px] sm:text-xs font-medium ${
+              className={`text-xs font-medium ${
                 isDarkMode ? "text-gray-300" : "text-gray-500"
               }`}
             >
@@ -255,39 +255,39 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
           </div>
         </div>
         <span
-          className="px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold rounded-full bg-[#96be25] text-white shadow flex-shrink-0"
-          style={{ minWidth: 50, textAlign: "center" }}
+          className="px-3 py-1 text-xs font-bold rounded-full bg-[#96be25] text-white shadow ml-2"
+          style={{ minWidth: 60, textAlign: "center" }}
         >
           {file.processingStatus.charAt(0).toUpperCase() +
             file.processingStatus.slice(1)}
         </span>
       </div>
 
-      <div className="mb-2 sm:mb-4 flex-1">
+      <div className="mb-4 flex-1">
         <p
-          className={`text-[10px] sm:text-xs font-medium ${
+          className={`text-xs font-medium ${
             isDarkMode ? "text-gray-400" : "text-gray-500"
           }`}
         >
           Uploaded {new Date(file.createdAt).toLocaleDateString()}
         </p>
         {file.aiSummary && (
-          <p className="text-[10px] sm:text-xs font-bold text-[#96be25] mt-1">
+          <p className="text-xs font-bold text-[#96be25] mt-1">
             ✓ AI Analysis Complete
           </p>
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-2 sm:mt-4">
+      <div className="flex flex-col sm:flex-row gap-3 mt-4">
         <button
           onClick={() => setSelectedFile(file)}
-          className="flex-1 bg-[#2596be] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all shadow-md"
+          className="flex-1 bg-[#2596be] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#1d7a9c] focus:outline-none focus:ring-2 focus:ring-[#2596be] transition-all shadow-md"
         >
           View Details
         </button>
         <button
           onClick={() => handleDownloadFile(file)}
-          className="flex-1 border border-[#e2e8f0] text-[#2596be] bg-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-[#f6fcf3] focus:outline-none focus:ring-2 focus:ring-[#96be25] transition-all shadow-md"
+          className="flex-1 border border-[#e2e8f0] text-[#2596be] bg-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#f6fcf3] focus:outline-none focus:ring-2 focus:ring-[#96be25] transition-all shadow-md"
         >
           Download
         </button>
@@ -398,7 +398,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
       {/* Toast Notification */}
       {toast.message && (
         <div
-          className={`fixed top-4 sm:top-6 left-1/2 transform -translate-x-1/2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg z-50 font-bold text-center animate-fade-in text-sm sm:text-base max-w-[90%] sm:max-w-md ${
+          className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg z-50 font-bold text-center animate-fade-in ${
             toast.type === "success"
               ? "bg-green-500 text-white"
               : "bg-red-500 text-white"
@@ -418,11 +418,11 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
         ) : (
           <>
             {/* Header */}
-            <div className="mb-4 sm:mb-6 md:mb-8">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 md:gap-6">
+            <div className="mb-8">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                 <div>
                   <h1
-                    className={`text-xl sm:text-2xl font-bold ${
+                    className={`text-2xl font-bold ${
                       isDarkMode
                         ? "text-white"
                         : "text-[var(--color-text-dark)]"
@@ -431,15 +431,15 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                     Medical Documents
                   </h1>
                   <p
-                    className={`text-xs sm:text-sm font-medium ${
+                    className={`text-sm font-medium ${
                       isDarkMode ? "text-gray-400" : "text-gray-500"
                     }`}
                   >
                     {filteredFiles.length} documents found
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full lg:w-auto">
-                  <div className="relative flex-1 min-w-0 sm:min-w-[200px] md:min-w-[250px]">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1 min-w-[250px]">
                     <input
                       type="text"
                       placeholder="Search documents..."
@@ -449,10 +449,10 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                         isDarkMode
                           ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                           : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)] placeholder-gray-500"
-                      } pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                      } pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-bold shadow-sm`}
                     />
                     <svg
-                      className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-gray-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -465,7 +465,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                       />
                     </svg>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0 flex-wrap sm:flex-nowrap">
+                  <div className="flex gap-2">
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
@@ -473,7 +473,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                         isDarkMode
                           ? "bg-gray-700 border-gray-600 text-white"
                           : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)]"
-                      } px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                      } px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-bold shadow-sm`}
                     >
                       <option value="all">All Status</option>
                       <option value="completed">Completed</option>
@@ -488,7 +488,7 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                         isDarkMode
                           ? "bg-gray-700 border-gray-600 text-white"
                           : "bg-white border-[var(--color-border)] text-[var(--color-text-dark)]"
-                      } px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-medium shadow-sm`}
+                      } px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:border-transparent font-bold shadow-sm`}
                     >
                       <option value="newest">Newest First</option>
                       <option value="oldest">Oldest First</option>
@@ -501,20 +501,20 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                           isDarkMode
                             ? "border-gray-600"
                             : "border-[var(--color-border)]"
-                        } rounded-lg sm:rounded-xl`}
+                        } rounded-xl`}
                       >
                         <button
                           onClick={() => setLocalViewMode("grid")}
-                          className={`p-1.5 sm:p-2 ${
+                          className={`p-2 ${
                             viewMode === "grid"
                               ? "bg-[#2596be] text-white"
                               : isDarkMode
                               ? "text-gray-400 hover:text-gray-300"
                               : "text-gray-500 hover:text-gray-700"
-                          } rounded-l-lg sm:rounded-l-xl`}
+                          } rounded-l-xl`}
                         >
                           <svg
-                            className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                            className="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -529,16 +529,16 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                         </button>
                         <button
                           onClick={() => setLocalViewMode("list")}
-                          className={`p-1.5 sm:p-2 ${
+                          className={`p-2 ${
                             viewMode === "list"
                               ? "bg-[#2596be] text-white"
                               : isDarkMode
                               ? "text-gray-400 hover:text-gray-300"
                               : "text-gray-500 hover:text-gray-700"
-                          } rounded-r-lg sm:rounded-r-xl`}
+                          } rounded-r-xl`}
                         >
                           <svg
-                            className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                            className="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -604,16 +604,23 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
               </div>
             ) : viewMode === "grid" ? (
               <div
-                className="grid gap-3 sm:gap-4"
+                className="grid gap-2 sm:gap-4"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
                   gridAutoRows: "1fr",
                   alignItems: "stretch",
                 }}
               >
                 {sortedFiles.map((file) => (
-                  <div key={file._id} className="flex">
+                  <div
+                    key={file._id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      height: "100%",
+                    }}
+                  >
                     <DocumentCard file={file} />
                   </div>
                 ))}
@@ -698,18 +705,14 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
       </div>
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div
-            className={`rounded-xl shadow-lg p-4 sm:p-6 max-w-sm w-full ${
-              isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+            className={`bg-white rounded-xl shadow-lg p-6 max-w-sm w-full ${
+              isDarkMode ? "bg-gray-800 text-white" : ""
             }`}
           >
-            <h3 className="font-bold text-base sm:text-lg mb-2">Delete File</h3>
-            <p
-              className={`mb-4 text-sm sm:text-base ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <h3 className="font-bold text-lg mb-2">Delete File</h3>
+            <p className="mb-4">
               Are you sure you want to delete{" "}
               <span className="font-semibold">{fileToDelete?.name}</span>?
             </p>
@@ -719,13 +722,13 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                   setShowDeleteModal(false);
                   setFileToDelete(null);
                 }}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteFile}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-red-500 text-white font-semibold hover:bg-red-600"
+                className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600"
               >
                 Delete
               </button>
@@ -736,22 +739,16 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
 
       {/* Download Preview Modal */}
       {showDownloadModal && fileToDownload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div
-            className={`rounded-xl shadow-lg p-4 sm:p-6 max-w-sm w-full ${
-              isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+            className={`bg-white rounded-xl shadow-lg p-6 max-w-sm w-full ${
+              isDarkMode ? "bg-gray-800 text-white" : ""
             }`}
           >
-            <h3 className="font-bold text-base sm:text-lg mb-2">
-              Download Preview
-            </h3>
-            <p
-              className={`mb-4 text-sm sm:text-base ${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <h3 className="font-bold text-lg mb-2">Download Preview</h3>
+            <p className="mb-4">
               You are about to download{" "}
-              <span className="font-semibold break-words">
+              <span className="font-semibold">
                 {fileToDownload.originalname}
               </span>
               .
@@ -762,13 +759,13 @@ const DocumentsView = ({ selectedPatient, viewMode: propViewMode }) => {
                   setShowDownloadModal(false);
                   setFileToDownload(null);
                 }}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
+                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDownloadFile}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm bg-[#2596be] text-white font-semibold hover:bg-[#1d7a9c]"
+                className="px-4 py-2 rounded-lg bg-[#2596be] text-white font-semibold hover:bg-[#1d7a9c]"
               >
                 Download
               </button>
